@@ -63,7 +63,7 @@ class Box_info(object):
     @property
     def positive_points_map(self):
         temp_positive_points_map = self.__positive_points_map
-        self.__positive_points_map=None
+        # self.__positive_points_map=None
         return temp_positive_points_map
     @positive_points_map.setter
     def positive_points_map(self,positive_points_map):
@@ -128,6 +128,7 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
     def forward(self, input, bboxes_bs, threshold_lamda):
         # input is a [GHC, LOC] list with 'bs,c,h,w' format tensor.
         # bboxes is a bs list with 'n,c' tensor, n is the num of box.
+        FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
 
         targets = [] ### targets is a list wiht 2 members, each is a 'bs,h,w,c' format tensor(cls and bbox).
         targets_cls = []
@@ -142,7 +143,6 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
 
         if self.assign_method == "auto_assign":
             ################# Get predict bboxes
-            FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
 
             # bs, h, w
             ref_point_xs = ((torch.linspace(0, in_w - 1, in_w).repeat(in_h, 1))*(self.model_input_size[0]/in_w) + (self.model_input_size[0]/in_w)/2).repeat(bs, 1, 1)
@@ -192,7 +192,9 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
                 targets_loc.append(label_list[1])
                 continue
             sample_weight_map = np.array([0.]*int(self.out_feature_size[0])*int(self.out_feature_size[1]))
-            sample_weight_map.reshape(int(self.out_feature_size[1]), int(self.out_feature_size[0])) ## h,w
+            sample_weight_map = sample_weight_map.reshape(int(self.out_feature_size[1]), int(self.out_feature_size[0])) ## h,w
+            sample_weight_map = torch.from_numpy(sample_weight_map)
+            sample_weight_map = sample_weight_map.type(FloatTensor)
 
             for box_info in box_info_list:
                 predict_conf = predict_GHC_one_batch * box_info.positive_points_map
@@ -202,8 +204,9 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
 
                 sample_weight_map_for_one_box = sample_weight * box_info.positive_points_map
                 sample_weight_map += sample_weight_map_for_one_box
+            sample_weight_map = sample_weight_map.reshape((1, int(self.out_feature_size[1]), int(self.out_feature_size[0])))
 
-            label_list[1][:,:,4] = sample_weight_map
+            label_list[1][:,:,:,4] = sample_weight_map
             targets_cls.append(label_list[0])
             targets_loc.append(label_list[1])
         targets_cls = torch.cat(targets_cls, 0) ### 'bs,h,w,c' format tensor
@@ -214,6 +217,7 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
 
         
     def __get_boxes_info_and_targets_with_guassion(self, bboxes): ###
+        FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
         ###  bbox[0] x1, bbox[1] y1, bbox[2] x2, bbox[3] y2, bbox[4] class_id, bbox[5] object score (difficult) ###
         label_list=[]
         class_label_map = np.array(([1.] + [0.] * (self.num_classes - 1))*int(self.out_feature_size[0])*int(self.out_feature_size[1])) ### For targets
@@ -302,19 +306,23 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
         for box_id in box_id_list:
             True_False_map = box_ids_map == box_id
             if any(True_False_map): # If any member of box_id_map is True, return True; all the member is False, return False.
-                box_id_list.remove(box_id)
                 for box_info in box_info_list:
                     if box_info.box_id == box_id:
-                        True_False_map.reshape(int(self.out_feature_size[1]), int(self.out_feature_size[0])) ### h,w
+                        True_False_map = True_False_map.reshape(int(self.out_feature_size[1]), int(self.out_feature_size[0])) ### h,w
+                        True_False_map = torch.from_numpy(True_False_map)
+                        True_False_map = True_False_map.type(FloatTensor)
                         box_info.positive_points_map = True_False_map
+            else:
+                for box_info in box_info_list:
+                    if box_info.box_id == box_id:
+                        box_info_list.remove(box_info)
         return box_info_list, label_list
 
       
     def __get_boxes_info_and_targets_with_dynamicLableAssign(self, predict_bbox, bboxes): ###
-        
-        FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
         ### predict_bbox feature_h, feature_w, 4 (4: cx, cy, o_w, o_h)
         ### bboxes m,6 (6: x1, y1, x2, y2, class_id, object score)
+        FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
 
         label_list=[]
         class_label_map = np.array(([1.] + [0.] * (self.num_classes - 1))*int(self.out_feature_size[0])*int(self.out_feature_size[1])) ### For targets
@@ -333,7 +341,7 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
 
         box_id_list = []
         box_info_list = []
-        position_ciou_value_dic = []
+        position_ciou_value_dic = {}
 
         # convert x1,y1,x2,y2 to cx,cy,o_w,o_h
         ### bboxes m,6 (6:cx, cy, w, h, class_id, object score)
@@ -342,7 +350,7 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
         bboxes[:, 0] = bboxes[:, 0] + bboxes[:, 2] / 2 # cx
         bboxes[:, 1] = bboxes[:, 1] + bboxes[:, 3] / 2 # cy
 
-        ### -1 means negative, 0 means ignore, other number means box_id
+        ### -1 means negative, or ignore, other number means box_id
         box_ids_map = np.array([-1.]*int(self.out_feature_size[0])*int(self.out_feature_size[1]))
         for box_id, bbox in enumerate(bboxes):
             obj_area = bbox[2] * bbox[3]
@@ -437,16 +445,22 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
         for box_id in box_id_list:
             True_False_map = box_ids_map == box_id
             if any(True_False_map): # If any member of box_id_map is True, return True; all the member is False, return False.
-                box_id_list.remove(box_id)
                 for box_info in box_info_list:
                     if box_info.box_id == box_id:
-                        True_False_map.reshape(int(self.out_feature_size[1]), int(self.out_feature_size[0])) ### h,w
+                        True_False_map = True_False_map.reshape(int(self.out_feature_size[1]), int(self.out_feature_size[0])) ### h,w
+                        True_False_map = torch.from_numpy(True_False_map)
+                        True_False_map = True_False_map.type(FloatTensor)
                         box_info.positive_points_map = True_False_map
+            else:
+                for box_info in box_info_list:
+                    if box_info.box_id == box_id:
+                        box_info_list.remove(box_info)
         return box_info_list, label_list
 
        
     def __get_boxes_info_and_targets(self, bboxes): ###
         ###  bbox[0] x1, bbox[1] y1, bbox[2] x2, bbox[3] y2, bbox[4] class_id, bbox[5] object score (difficult) ###
+        FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
         label_list=[]
         class_label_map = np.array(([1.] + [0.] * (self.num_classes - 1))*int(self.out_feature_size[0])*int(self.out_feature_size[1])) ### For targets
         points_label_map = np.array([1.]*6*int(self.out_feature_size[0])*int(self.out_feature_size[1])) ### For targets
@@ -528,11 +542,16 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
         for box_id in box_id_list:
             True_False_map = box_ids_map == box_id
             if any(True_False_map): # If any member of box_id_map is True, return True; all the member is False, return False.
-                box_id_list.remove(box_id)
                 for box_info in box_info_list:
                     if box_info.box_id == box_id:
-                        True_False_map.reshape(int(self.out_feature_size[1]), int(self.out_feature_size[0])) ### h,w
+                        True_False_map = True_False_map.reshape(int(self.out_feature_size[1]), int(self.out_feature_size[0])) ### h,w
+                        True_False_map = torch.from_numpy(True_False_map)
+                        True_False_map = True_False_map.type(FloatTensor)
                         box_info.positive_points_map = True_False_map
+            else:
+                for box_info in box_info_list:
+                    if box_info.box_id == box_id:
+                        box_info_list.remove(box_info)
         return box_info_list, label_list
 
 class getTargets(nn.Module):
