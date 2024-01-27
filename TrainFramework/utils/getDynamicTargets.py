@@ -112,7 +112,7 @@ def getSPL_SampleWeight_soft(sample_score, m_root, threshold_lamda):
         return 0
 
 class getTargetsWithSPL_SampleWeight(nn.Module):
-    def __init__(self, model_input_size, num_classes=2, scale=80., stride=2, assign_method="auto_assign", default_inner_proportion=0.7, default_guassion_value=0.3, m_root=3, cuda=True):
+    def __init__(self, model_input_size, num_classes=2, scale=80., stride=2, assign_method="auto_assign", default_inner_proportion=0.7, default_guassion_value=0.3, m_root=6, cuda=True):
         super(getTargetsWithSPL_SampleWeight, self).__init__()
         self.model_input_size = model_input_size#(672,384)#feature_w,feature_h
         self.num_classes = num_classes
@@ -126,7 +126,7 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
         self.cuda = cuda
 
     def forward(self, input, bboxes_bs, threshold_lamda):
-        # input is a [GHC, LOC] list with 'bs,c,h,w' format tensor.
+        # input is a [CONF, LOC] list with 'bs,c,h,w' format tensor.
         # bboxes is a bs list with 'n,c' tensor, n is the num of box.
         FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
 
@@ -138,8 +138,8 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
         in_h = input[0].size(2) # in_h = model_input_size[1]/2 (stride = 2)
         in_w = input[0].size(3) # in_w
 
-        predict_GHC = input[0] # 'bs,1,h,w' format tensor, c=1
-        predict_GHC = predict_GHC.squeeze() # 'bs,h,w' format tensor
+        predict_CONF = input[0] # 'bs,1,h,w' format tensor, c=1
+        predict_CONF = predict_CONF.squeeze() # 'bs,h,w' format tensor
 
         if self.assign_method == "auto_assign":
             ################# Get predict bboxes
@@ -173,8 +173,8 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
             ###########################
 
         for b in range(bs):
-            predict_GHC_one_batch = predict_GHC[b] # 'h,w' format tensor
-            predict_GHC_one_batch = torch.sigmoid(predict_GHC_one_batch)
+            predict_CONF_one_batch = predict_CONF[b] # 'h,w' format tensor
+            predict_CONF_one_batch = torch.sigmoid(predict_CONF_one_batch)
 
             bboxes = bboxes_bs[b]
             if self.assign_method == "binary_assign":
@@ -197,10 +197,11 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
             sample_weight_map = sample_weight_map.type(FloatTensor)
 
             for box_info in box_info_list:
-                predict_conf = predict_GHC_one_batch * box_info.positive_points_map
+                predict_conf = predict_CONF_one_batch * box_info.positive_points_map
                 predict_score = torch.max(predict_conf)
                 # Convert the predict_score to sample weight through SPL regularizer
-                sample_weight = getSPL_SampleWeight_soft(predict_score, self.m_root, threshold_lamda)
+                # sample_weight = getSPL_SampleWeight_soft(predict_score, self.m_root, threshold_lamda)
+                sample_weight = getSPL_SampleWeight_hard(predict_score, threshold_lamda)
 
                 sample_weight_map_for_one_box = sample_weight * box_info.positive_points_map
                 sample_weight_map += sample_weight_map_for_one_box
@@ -261,7 +262,7 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
             guassion_variance_x = (length_inner_ellipse_x_semi_axis**2/(2*(-1)*math.log(self.default_guassion_value)))**0.5
             guassion_variance_y = (length_inner_ellipse_y_semi_axis**2/(2*(-1)*math.log(self.default_guassion_value)))**0.5
 
-            lamda =  self.size_per_ref_point / obj_area**0.5 #This parameter is related to the size of the target, and the smaller the target, the larger the parameter. 
+            lamda =  self.size_per_ref_point / obj_area**0.5  # Note: This parameter is not used in this version. #This parameter is related to the size of the target, and the smaller the target, the larger the parameter. 
 
             min_wight_index, min_height_index, max_wight_index, max_height_index = min_max_ref_point_index(bbox,self.out_feature_size,self.model_input_size)
             for i in range(min_height_index, max_height_index+1):
@@ -397,7 +398,7 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
             ##############
             # The positive anchor points of the object is more, 
             # the weight(lamda) is smaller. To balance the positive anchor points number of different object.
-            lamda = (1/dynamic_k)**(1/2)
+            lamda = (1/dynamic_k)**(1/2)  # Note: This parameter is not used in this version.
 
             for i in range(min_height_index, max_height_index+1):
                 for j in range(min_wight_index, max_wight_index+1):
@@ -498,7 +499,7 @@ class getTargetsWithSPL_SampleWeight(nn.Module):
             inner_bbox[2] = inner_bbox[2] * self.default_inner_proportion ### o_w
             inner_bbox[3] = inner_bbox[3] * self.default_inner_proportion ### o_h
 
-            lamda =  self.size_per_ref_point / obj_area**0.5 #This parameter is related to the size of the target, and the smaller the target, the larger the parameter. 
+            lamda =  self.size_per_ref_point / obj_area**0.5   # Note: This parameter is not used in this version. #This parameter is related to the size of the target, and the smaller the target, the larger the parameter. 
 
             min_wight_index, min_height_index, max_wight_index, max_height_index = min_max_ref_point_index(bbox,self.out_feature_size,self.model_input_size)
             for i in range(min_height_index, max_height_index+1):
@@ -566,9 +567,10 @@ class getTargets(nn.Module):
         self.cuda = cuda
 
     # def forward(self, batch_size, bboxes_bs):
-    def forward(self, input, bboxes_bs):
-        # input is a [GHC, LOC] list with 'bs,c,h,w' format tensor.
+    def forward(self, input, bboxes_bs, difficult_mode):
+        # input is a [CONF, LOC] list with 'bs,c,h,w' format tensor.
         # bboxes is a bs list with 'n,c' tensor, n is the num of box.
+        # difficult_mode # 0 means no difficult difference, 1 means simple sample only.
         targets = [] ### targets is a list wiht 2 members, each is a 'bs,h,w,c' format tensor(cls and bbox).
         targets_cls = []
         targets_loc = []
@@ -612,7 +614,7 @@ class getTargets(nn.Module):
         for b in range(bs):
             bboxes = bboxes_bs[b]
             predict_bboxes = predict_bboxes_bs[b]
-            label_list = self.__get_targets_with_dynamicLableAssign(predict_bbox=predict_bboxes,bboxes=bboxes) ### label_list[0], label_list[1] '1,h,w,c'
+            label_list = self.__get_targets_with_dynamicLableAssign(predict_bbox=predict_bboxes,bboxes=bboxes, difficult_mode=difficult_mode) ### label_list[0], label_list[1] '1,h,w,c'
             targets_cls.append(label_list[0])
             targets_loc.append(label_list[1])
         targets_cls = torch.cat(targets_cls, 0) ### 'bs,h,w,c' format tensor
@@ -621,7 +623,7 @@ class getTargets(nn.Module):
         targets.append(targets_loc)
         return targets
       
-    def __get_targets_with_dynamicLableAssign(self, predict_bbox, bboxes): ###
+    def __get_targets_with_dynamicLableAssign(self, predict_bbox, bboxes, difficult_mode): ###
 
         FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
 
@@ -691,10 +693,19 @@ class getTargets(nn.Module):
             sorted_iou = np.sort(dropout_iou)
             second_filter_index = iou_filter <= sorted_iou[-(dynamic_k+1)]
             iou_filter[second_filter_index] = 0  # second filter: dynamic_k filter
+
+            if difficult_mode: # simple sample only
+                if bbox[5] >= 0.625:
+                    object_score = 1
+                else:
+                    object_score = 0
+            else: # no difficulty different
+                object_score = 1
+
             ##############
             # The positive anchor points of the object is more, 
             # the weight(lamda) is smaller. To balance the positive anchor points number of different object.
-            lamda = (1/dynamic_k)**(1/2)
+            lamda = (1/dynamic_k)**(1/2)  # Note: This parameter is not used in this version.
 
             for i in range(min_height_index, max_height_index+1):
                 for j in range(min_wight_index, max_wight_index+1):
@@ -723,7 +734,7 @@ class getTargets(nn.Module):
                         points_label_map[(i*int(self.out_feature_size[0]) + j) * 6 + 3] = bbox[3] # o_h
                         
 
-                        points_label_map[(i*int(self.out_feature_size[0]) + j) * 6 + 4] = bbox[5] # difficult
+                        points_label_map[(i*int(self.out_feature_size[0]) + j) * 6 + 4] = object_score
                         points_label_map[(i*int(self.out_feature_size[0]) + j) * 6 + 5] = lamda # lamda parameter
                     
                     else:# The point is not in positive anchor points.

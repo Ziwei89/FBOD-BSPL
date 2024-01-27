@@ -210,9 +210,9 @@ if __name__ == "__main__":
 
     ############### For log figure ################
     log_pic_name_loss = "train_output_img/" + num_to_english_c_dic[opt.input_img_num] + "/" +opt.model_input_size + "/" + opt.input_mode + "_" + opt.aggregation_method \
-                                            + "_" + opt.backbone_name + "_" + opt.fusion_method + "_" + "loss_" + abbr_assign_method + "_" + opt.Add_name + ".jpg"
+                                            + "_" + opt.backbone_name + "_" + opt.fusion_method + "_" + abbr_assign_method + "_" + opt.Add_name + "_loss.jpg"
     log_pic_name_ap50 = "train_output_img/" + num_to_english_c_dic[opt.input_img_num] + "/" +opt.model_input_size + "/" + opt.input_mode + "_" + opt.aggregation_method \
-                                            + "_" + opt.backbone_name + "_" + opt.fusion_method + "_" + "ap50_" + abbr_assign_method + "_" + opt.Add_name + ".jpg"
+                                            + "_" + opt.backbone_name + "_" + opt.fusion_method + "_" + abbr_assign_method + "_" + opt.Add_name + "_ap50.jpg"
     os.makedirs("train_output_img/" + num_to_english_c_dic[opt.input_img_num] + "/" + opt.model_input_size + "/", exist_ok=True)
     ################################################
 
@@ -299,75 +299,36 @@ if __name__ == "__main__":
     
     #------------------------------------------------------#
     #------------------------------------------------------#
+    lr = 1e-3
+    Batch_size = opt.Batch_size
+    Freeze_Epoch = second_start_epoch
+    # Freeze_Epoch = 85
+    Unfreeze_Epoch = 100
+    # Unfreeze_Epoch = 200
 
-    # if os.path.exists(model_path):
-    if False:
-        second_start_epoch = 50
+    optimizer = optim.Adam(net.parameters(),lr,weight_decay=5e-4)
+    lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
+    
+    train_data = CustomDataset(train_lines, (model_input_size[1], model_input_size[0]), image_path=train_dataset_image_path, input_mode=opt.input_mode, continues_num=opt.input_img_num, assign_method=opt.assign_method)
+    train_dataloader = DataLoader(train_data, batch_size=Batch_size, shuffle=True, num_workers=4, pin_memory=True, collate_fn=dataset_collate)
+    
+    val_data = CustomDataset(val_lines, (model_input_size[1], model_input_size[0]), image_path=val_dataset_image_path, input_mode=opt.input_mode, continues_num=opt.input_img_num, assign_method=opt.assign_method)
+    val_dataloader = DataLoader(val_data, batch_size=Batch_size, shuffle=True, num_workers=4, pin_memory=True, collate_fn=dataset_collate)
 
-        lr = 1e-3
-        Batch_size = opt.Batch_size
-        Init_Epoch = 0
-        Freeze_Epoch = 50
-        
-        optimizer = optim.Adam(net.parameters(),lr,weight_decay=5e-4)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
-        
-        # (train_lines, image_size, image_path, input_mode="GRG", continues_num=5)
-        train_data = CustomDataset(train_lines, (model_input_size[1], model_input_size[0]), image_path=train_dataset_image_path, input_mode=opt.input_mode, continues_num=opt.input_img_num)
-        train_dataloader = DataLoader(train_data, batch_size=Batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=dataset_collate)
+    epoch_size = max(1, num_train//Batch_size)
+    epoch_size_val = num_val//Batch_size
+    #------------------------------------#
+    #   解冻后训练
+    #------------------------------------#
+    for param in model.extract_features.backbone.parameters():
+        param.requires_grad = True
 
-        val_data = CustomDataset(val_lines, (model_input_size[1], model_input_size[0]), image_path=val_dataset_image_path, input_mode=opt.input_mode, continues_num=opt.input_img_num)
-        val_dataloader = DataLoader(val_data, batch_size=Batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=dataset_collate)
-
-        epoch_size = max(1, num_train//Batch_size)
-        epoch_size_val = num_val//Batch_size
-        #------------------------------------#
-        #   冻结一定部分训练
-        #------------------------------------#
-        for param in model.extract_features.backbone.parameters():
-            param.requires_grad = False
-        
-        largest_AP_50=0
-        for epoch in range(Init_Epoch,Freeze_Epoch):
-            train_loss, val_loss,largest_AP_50_record, AP_50 = fit_one_epoch(largest_AP_50,net,loss_func,epoch,epoch_size,epoch_size_val,train_dataloader,val_dataloader,Freeze_Epoch,Cuda,save_model_dir, labels_to_results=labels_to_results, detect_post_process=detect_post_process)
-            largest_AP_50 = largest_AP_50_record
-            if (epoch+1)>=2:
-                draw_curve_loss(epoch+1, train_loss.item(), val_loss.item(), log_pic_name_loss)
-            if (epoch+1)>=50:
-                draw_curve_ap50(epoch+1, AP_50, log_pic_name_ap50)
-            lr_scheduler.step()
-
-    if True:
-        lr = 1e-3
-        Batch_size = opt.Batch_size
-        Freeze_Epoch = second_start_epoch
-        # Freeze_Epoch = 85
-        Unfreeze_Epoch = 100
-        # Unfreeze_Epoch = 200
-
-        optimizer = optim.Adam(net.parameters(),lr,weight_decay=5e-4)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
-        
-        train_data = CustomDataset(train_lines, (model_input_size[1], model_input_size[0]), image_path=train_dataset_image_path, input_mode=opt.input_mode, continues_num=opt.input_img_num, assign_method=opt.assign_method)
-        train_dataloader = DataLoader(train_data, batch_size=Batch_size, shuffle=True, num_workers=4, pin_memory=True, collate_fn=dataset_collate)
-       
-        val_data = CustomDataset(val_lines, (model_input_size[1], model_input_size[0]), image_path=val_dataset_image_path, input_mode=opt.input_mode, continues_num=opt.input_img_num, assign_method=opt.assign_method)
-        val_dataloader = DataLoader(val_data, batch_size=Batch_size, shuffle=True, num_workers=4, pin_memory=True, collate_fn=dataset_collate)
-
-        epoch_size = max(1, num_train//Batch_size)
-        epoch_size_val = num_val//Batch_size
-        #------------------------------------#
-        #   解冻后训练
-        #------------------------------------#
-        for param in model.extract_features.backbone.parameters():
-            param.requires_grad = True
-
-        largest_AP_50=0
-        for epoch in range(Freeze_Epoch,Unfreeze_Epoch):
-            train_loss, val_loss,largest_AP_50_record, AP_50 = fit_one_epoch(largest_AP_50,net,loss_func,epoch,epoch_size,epoch_size_val,train_dataloader,val_dataloader,Unfreeze_Epoch,Cuda,save_model_dir, labels_to_results=labels_to_results, detect_post_process=detect_post_process)
-            largest_AP_50 = largest_AP_50_record
-            if (epoch+1)>=2:
-                draw_curve_loss(epoch+1, train_loss.item(), val_loss.item(), log_pic_name_loss)
-            if (epoch+1)>=40:
-                draw_curve_ap50(epoch+1, AP_50, log_pic_name_ap50)
-            lr_scheduler.step()
+    largest_AP_50=0
+    for epoch in range(Freeze_Epoch,Unfreeze_Epoch):
+        train_loss, val_loss,largest_AP_50_record, AP_50 = fit_one_epoch(largest_AP_50,net,loss_func,epoch,epoch_size,epoch_size_val,train_dataloader,val_dataloader,Unfreeze_Epoch,Cuda,save_model_dir, labels_to_results=labels_to_results, detect_post_process=detect_post_process)
+        largest_AP_50 = largest_AP_50_record
+        if (epoch+1)>=2:
+            draw_curve_loss(epoch+1, train_loss.item(), val_loss.item(), log_pic_name_loss)
+        if (epoch+1)>=40:
+            draw_curve_ap50(epoch+1, AP_50, log_pic_name_ap50)
+        lr_scheduler.step()

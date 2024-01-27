@@ -64,7 +64,8 @@ class opts(object):
                             help='cross_vx: The Cross Validation data set')
         
         self.parser.add_argument('--learn_mode', default="spl", type=str,
-                            help='learn_mode: "general" or "spl". "general": mean General approach to model training, "spl": mean self-pace learning approach to model training.')
+                            help='learn_mode: "general", "simple_sample" and "spl". "general": mean General approach to model training, \
+                                 "simple_sample": mean using the simple samples to the model, "spl": mean self-pace learning approach to model training.')
         
         ######### for test
         self.parser.add_argument('--model_name', default="FB_object_detect_model.pth", type=str,

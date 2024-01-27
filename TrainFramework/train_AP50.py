@@ -59,7 +59,7 @@ class LablesToResults(object):
                 label_obj_list.append(FBObj(score=1., image_id=image_id, bbox=box))
         return label_obj_list
 
-def fit_one_epoch(largest_AP_50,net,loss_func,epoch,epoch_size,epoch_size_val,gen,genval,
+def fit_one_epoch(largest_AP_50,net,loss_func_train,loss_func_val,epoch,epoch_size,epoch_size_val,gen,genval,
                   Epoch,cuda,save_model_dir,labels_to_results,detect_post_process,spl_threshold):
     total_loss = 0
     val_loss = 0
@@ -85,10 +85,7 @@ def fit_one_epoch(largest_AP_50,net,loss_func,epoch,epoch_size,epoch_size_val,ge
                     targets = [Variable(torch.from_numpy(fature_label).type(torch.FloatTensor)) for fature_label in targets] ##
             optimizer.zero_grad()
             outputs = net(images)
-            if loss_func.cuda == False:
-                loss = loss_func(outputs, targets, spl_threshold)
-            else:
-                loss = loss_func(outputs, targets, spl_threshold)
+            loss = loss_func_train(outputs, targets, spl_threshold)
             loss.backward()
             optimizer.step()
 
@@ -127,11 +124,7 @@ def fit_one_epoch(largest_AP_50,net,loss_func,epoch,epoch_size,epoch_size_val,ge
                     targets_val = [Variable(torch.from_numpy(fature_label).type(torch.FloatTensor)) for fature_label in targets_val] ##
                 optimizer.zero_grad()
                 outputs = net(images_val)
-
-                if loss_func.cuda == False:
-                    loss = loss_func(outputs, targets_val, spl_threshold)
-                else:
-                    loss = loss_func(outputs, targets_val, spl_threshold)
+                loss = loss_func_val(outputs, targets_val, spl_threshold)
                 val_loss += loss
 
                 if (epoch+1) >= 30:
@@ -228,9 +221,9 @@ if __name__ == "__main__":
 
     ############### For log figure ################
     log_pic_name_loss = "train_output_img/" + num_to_english_c_dic[opt.input_img_num] + "/" +opt.model_input_size + "/" + opt.input_mode + "_" + opt.aggregation_method \
-                                            + "_" + opt.backbone_name + "_" + opt.fusion_method + "_" + "loss_" + opt.learn_mode + "_" + abbr_assign_method + "_" + opt.Add_name + ".jpg"
+                                            + "_" + opt.backbone_name + "_" + opt.fusion_method + "_" + opt.learn_mode + "_" + abbr_assign_method + "_" + opt.Add_name + "_loss.jpg"
     log_pic_name_ap50 = "train_output_img/" + num_to_english_c_dic[opt.input_img_num] + "/" +opt.model_input_size + "/" + opt.input_mode + "_" + opt.aggregation_method \
-                                            + "_" + opt.backbone_name + "_" + opt.fusion_method + "_" + "ap50_" + opt.learn_mode + "_" + abbr_assign_method + "_" + opt.Add_name + ".jpg"
+                                            + "_" + opt.backbone_name + "_" + opt.fusion_method + "_" + opt.learn_mode + "_" + abbr_assign_method + "_" + opt.Add_name + "_ap50.jpg"
     os.makedirs("train_output_img/" + num_to_english_c_dic[opt.input_img_num] + "/" + opt.model_input_size + "/", exist_ok=True)
     ################################################
 
@@ -286,8 +279,12 @@ if __name__ == "__main__":
 
     # 建立loss函数
     # dynamic label assign, so the gettargets is ture.
-    loss_func = LossFunc(num_classes=num_classes, model_input_size=(model_input_size[1], model_input_size[0]), \
+    loss_func_train = LossFunc(num_classes=num_classes, model_input_size=(model_input_size[1], model_input_size[0]), \
                          learn_mode=opt.learn_mode, assign_method=opt.assign_method, cuda=Cuda, gettargets=True)
+    
+    loss_func_val = LossFunc(num_classes=num_classes, model_input_size=(model_input_size[1], model_input_size[0]), \
+                         learn_mode="general", assign_method=opt.assign_method, cuda=Cuda, gettargets=True)
+
 
     # For calculating the AP50
     detect_post_process = FB_Postprocess(batch_size=opt.Batch_size, model_input_size=model_input_size)
@@ -339,7 +336,7 @@ if __name__ == "__main__":
     largest_AP_50=0
     for epoch in range(start_Epoch,end_Epoch):
         spl_threshold = adjust_spl_threshold((epoch*1.)/end_Epoch)
-        train_loss, val_loss,largest_AP_50_record, AP_50 = fit_one_epoch(largest_AP_50,net,loss_func,epoch,epoch_size,epoch_size_val,train_dataloader,val_dataloader,
+        train_loss, val_loss,largest_AP_50_record, AP_50 = fit_one_epoch(largest_AP_50,net,loss_func_train,loss_func_val,epoch,epoch_size,epoch_size_val,train_dataloader,val_dataloader,
                                                                             end_Epoch,Cuda,save_model_dir, labels_to_results=labels_to_results, detect_post_process=detect_post_process, spl_threshold=spl_threshold)
         largest_AP_50 = largest_AP_50_record
         if (epoch+1)>=2:
