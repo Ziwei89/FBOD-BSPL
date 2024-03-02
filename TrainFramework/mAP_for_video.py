@@ -36,6 +36,7 @@ if __name__ == "__main__":
     input_mode=opt.input_mode
     backbone_name = opt.backbone_name
     fusion_method = opt.fusion_method
+    learn_mode = opt.learn_mode
     # assign_method: The label assign method. binary_assign, guassian_assign or auto_assign
     if opt.assign_method == "binary_assign":
         abbr_assign_method = "ba"
@@ -58,12 +59,12 @@ if __name__ == "__main__":
     fb_detector = FB_detector(model_input_size=model_input_size,
                               input_img_num=input_img_num, aggregation_output_channels=aggregation_output_channels,
                               aggregation_method=aggregation_method, input_mode=input_mode, backbone_name=backbone_name, fusion_method=fusion_method,
-                              abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name)
+                              learn_mode=learn_mode, abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name)
 
     
-    label_path = opt.data_label_path + "val/" #.xlm label file path
+    label_path = opt.data_root_path + "val/labels/" #.xlm label file path
 
-    video_path = opt.video_path
+    video_path = opt.data_root_path + "val/video/"
     video_name = opt.video_name
 
     continus_num = input_img_num

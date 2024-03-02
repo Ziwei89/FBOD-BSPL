@@ -4,7 +4,7 @@ import sys
 import math
 import copy
 sys.path.append("..")
-from .getDynamicTargets import getTargets, getTargetsWithSPL_SampleWeight
+from .getDynamicTargets import getTargets
 
 def MSELoss(pred,target):
     return (pred-target)**2
@@ -60,30 +60,28 @@ def box_ciou(b1, b2):
     return ciou
 
 class LossFunc(nn.Module): #
-    def __init__(self,num_classes, model_input_size=(672,384), scale=80., stride=2, learn_mode="spl", assign_method="auto_assign", cuda=True,gettargets=False):
+    def __init__(self,num_classes, model_input_size=(672,384), scale=80., stride=2, learn_mode="SPL", cuda=True, gettargets=False):
         super(LossFunc, self).__init__()
         self.num_classes = num_classes
         self.model_input_size = model_input_size
         self.scale = scale
         self.learn_mode = learn_mode
         #(model_input_size, num_classes=2, stride=2)
-        self.get_targets = getTargets(model_input_size, num_classes, scale, stride, cuda)
-        self.get_targets_SPL = getTargetsWithSPL_SampleWeight(model_input_size=model_input_size, num_classes=num_classes, scale=scale, stride=stride,
-                                                              assign_method=assign_method)
+        self.get_targets = getTargets(model_input_size, num_classes, scale=scale, stride=stride, cuda=True)
         self.cuda = cuda
         self.gettargets = gettargets
     
-    def forward(self, input, targets, spl_threshold_lamda):
+    def forward(self, input, targets, spl_threshold):
 
         FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
         # targets is bboxes, bbox[0] cx, bbox[1] cy, bbox[2] w, bbox[3] h, bbox[4] class_id, bbox[5] score
         if self.gettargets:
-            if self.learn_mode == "general":
+            if self.learn_mode == "All_Sample":
                 targets = self.get_targets(input, targets, difficult_mode=0) ### targets is a list wiht 2 members, each is a 'bs,in_h,in_w,c' format tensor(cls and bbox).
-            elif self.learn_mode == "simple_sample":
+            elif self.learn_mode == "Easy_sample":
                 targets = self.get_targets(input, targets, difficult_mode=1) ### targets is a list wiht 2 members, each is a 'bs,in_h,in_w,c' format tensor(cls and bbox).
-            elif self.learn_mode == "spl":
-                targets = self.get_targets_SPL(input, targets, spl_threshold_lamda)
+            elif self.learn_mode == "SPL" or self.learn_mode == "SPL_ESP_BC":
+                targets = self.get_targets(input, targets, difficult_mode=2, spl_threshold=spl_threshold)
             else:
                 raise("Error! learn_mode error.")
 

@@ -40,7 +40,7 @@ if __name__ == "__main__":
     input_mode=opt.input_mode
     backbone_name = opt.backbone_name
     fusion_method = opt.fusion_method
-
+    learn_mode = opt.learn_mode
     # assign_method: The label assign method. binary_assign, guassian_assign or auto_assign
     if opt.assign_method == "binary_assign":
         abbr_assign_method = "ba"
@@ -53,8 +53,8 @@ if __name__ == "__main__":
     Add_name=opt.Add_name
     model_name=opt.model_name
     
-    video_path = opt.video_path
-    label_path = opt.data_label_path + "val/" #.xlm label file path
+    video_path = opt.data_root_path + "val/video/"
+    label_path = opt.data_root_path + "val/labels/" #.xlm label file path
     label_name_list=os.listdir(label_path)
 
     video_name = opt.video_name
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     fb_detector = FB_detector(model_input_size=model_input_size,
                               input_img_num=input_img_num, aggregation_output_channels=aggregation_output_channels,
                               aggregation_method=aggregation_method, input_mode=input_mode, backbone_name=backbone_name, fusion_method=fusion_method,
-                              abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name)
+                              learn_mode=learn_mode, abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name)
     cap=cv2.VideoCapture(video_path + video_name)
     ret,frame=cap.read()
     if ret != True:
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         height, width, _ = frame.shape
         raw_image_shape = np.array([height, width])
     
-    Save_video_name = "./test_output/" + video_name.split(".")[0] + "_out.mp4"
+    Save_video_name = "./test_output/" + video_name.split(".")[0] + "_SS_out.mp4"
     fps = 25
 
     video_dir = os.path.join("./", Save_video_name)
@@ -113,8 +113,8 @@ if __name__ == "__main__":
 
                 detect_bboxes = outputs[0][:,:4]
                 for box in detect_bboxes:
-                    cv2.rectangle(image_opencv,(int(box[0]),int(box[1])),(int(box[2]),int(box[3])),(0,0,255),2)#x1,y1,x2,y2
-                for label_box in label_bboxes:
-                    cv2.rectangle(image_opencv,(int(label_box[0]),int(label_box[1])),(int(label_box[2]),int(label_box[3])),(0,255,0),2)#x1,y1,x2,y2
+                    cv2.rectangle(image_opencv,(int(box[0]),int(box[1])),(int(box[2]),int(box[3])),(0,255,0),2)#x1,y1,x2,y2
+                # for label_box in label_bboxes:
+                #     cv2.rectangle(image_opencv,(int(label_box[0]),int(label_box[1])),(int(label_box[2]),int(label_box[3])),(0,255,0),2)#x1,y1,x2,y2
                 videowriter.write(image_opencv)
     videowriter.release()

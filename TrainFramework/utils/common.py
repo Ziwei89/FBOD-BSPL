@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import copy
 from PIL import Image
+import dataloader.augmentations as DataAug
 
 def letterbox_image(image, size):
     iw, ih = image.size
@@ -30,7 +31,7 @@ def load_data(line, image_path, frame_num):
     first_img_num = int(first_img_num_str)
     images = []
     for num in range(first_img_num, first_img_num + frame_num):
-        num_str = "%05d" % int(num)
+        num_str = "%06d" % int(num)
         img_name = first_img_name.split(first_img_num_str)[0] + num_str + ".jpg"
         image_full_name = os.path.join(image_path,img_name)
         image = cv2.imread(image_full_name)
@@ -40,6 +41,30 @@ def load_data(line, image_path, frame_num):
     else:
         bboxes = np.array([np.array(list(map(float, box.split(',')))) for box in line[1:]])
     return images, bboxes, first_img_name
+
+def load_data_raw_resize_boxes(line, image_path, frame_num, image_size):
+    """line of train_lines was saved as 'image name, label'"""
+    line =  line.split()
+    first_img_name = line[0]
+    if  line[1:][0] == "None":
+        raw_bboxes = np.array([])
+        bboxes = np.array([])
+        images = None
+        return images, raw_bboxes, bboxes, first_img_name
+    else:
+        first_img_num_str = first_img_name.split(".")[0].split("_")[-1]
+        first_img_num = int(first_img_num_str)
+        images = []
+        for num in range(first_img_num, first_img_num + frame_num):
+            num_str = "%06d" % int(num)
+            img_name = first_img_name.split(first_img_num_str)[0] + num_str + ".jpg"
+            image_full_name = os.path.join(image_path,img_name)
+            image = cv2.imread(image_full_name)
+            images.append(image)
+        bboxes = np.array([np.array(list(map(float, box.split(',')))) for box in line[1:]])
+        raw_bboxes = copy.deepcopy(bboxes)
+        images, bboxes = DataAug.Resize(image_size, True)(np.copy(images), np.copy(bboxes))
+        return images, raw_bboxes, bboxes, first_img_name
 
 # np.set_printoptions(threshold=np.inf)
 # This function is different from obj detection stage.

@@ -13,10 +13,10 @@ class opts(object):
         self.parser.add_argument('--aggregation_output_channels', default=16, type=int,
                             help='aggregation_output_channels: The output channels of the aggregation module')
         
-        self.parser.add_argument('--aggregation_method', default='multiinput', type=str,
+        self.parser.add_argument('--aggregation_method', default='relatedatten', type=str,
                             help='aggregation_method: multiinput, relatedatten or convlstm')
         
-        self.parser.add_argument('--input_mode', default="GRG", type=str,
+        self.parser.add_argument('--input_mode', default="RGB", type=str,
                             help='input_mode: "RGB" or "GRG". "RGB": mean RGB ..RGB, "GRG": mean GRAY ..RGB.. GRAY')
         
         self.parser.add_argument('--backbone_name', default='cspdarknet53', type=str,
@@ -25,10 +25,10 @@ class opts(object):
         self.parser.add_argument('--fusion_method', default='concat', type=str,
                             help='fusion_method: concat or scm')
         
-        self.parser.add_argument('--assign_method', default='guassian_assign', type=str,
+        self.parser.add_argument('--assign_method', default='auto_assign', type=str,
                             help='assign_method: The label assign method. binary_assign, guassian_assign or auto_assign')
         
-        self.parser.add_argument('--Add_name', default='0816_1', type=str,
+        self.parser.add_argument('--Add_name', default='20240202', type=str,
                             help='Add_name: add name to logs and pic')
         
         self.parser.add_argument('--data_root_path', default="../../dataset/FlyingBird/", type=str,
@@ -63,9 +63,10 @@ class opts(object):
         self.parser.add_argument('--cross_vx', default="cross_v1", type=str,
                             help='cross_vx: The Cross Validation data set')
         
-        self.parser.add_argument('--learn_mode', default="spl", type=str,
-                            help='learn_mode: "general", "simple_sample" and "spl". "general": mean General approach to model training, \
-                                 "simple_sample": mean using the simple samples to the model, "spl": mean self-pace learning approach to model training.')
+        self.parser.add_argument('--learn_mode', default="SPL", type=str,
+                            help='learn_mode: "All_Sample", "Easy_sample" and "SPL". "All_Sample": means to train the model with all sample, \
+                                 "Easy_sample": means using the easy samples to the model, "SPL": means self-pace learning approach to model training, \
+                                    "SPL_ESP_BC": means the spl with easy sample prior based on confierence.')
         
         ######### for test
         self.parser.add_argument('--model_name', default="FB_object_detect_model.pth", type=str,

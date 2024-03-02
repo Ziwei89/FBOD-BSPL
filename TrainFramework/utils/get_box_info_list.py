@@ -11,6 +11,7 @@ class Box_info(object):
     def __init__(self, box_id, bbox, xyxy = False):
         ### bbox: bbox[0] cx, bbox[1] cy, bbox[2] w, bbox[3] h, bbox[4] class_id, bbox[5] object score (difficult)
         self.__box_id = box_id
+        self.__class_id = bbox[4]
         if xyxy==False:
             min_x = bbox[0] - bbox[2]/2
             min_y = bbox[1] - bbox[3]/2
@@ -26,6 +27,9 @@ class Box_info(object):
     @property
     def box_id(self):
         return self.__box_id
+    @property
+    def class_id(self):
+        return self.__class_id
     @property
     def bbox(self):
         return self.__bbox
@@ -82,7 +86,7 @@ class getBoxInfoListForOneImage(nn.Module):
         self.out_feature_size = [self.image_size[0]/stride, self.image_size[1]/stride]
         self.cuda = cuda
     
-    def forward(self, input, bboxes):
+    def forward(self, input, raw_bboxes, bboxes):
        # input is a [CONF, LOC] list with 'bs,c,h,w' format tensor.
         bs = input[0].size(0)
         if bs > 1:
@@ -91,17 +95,19 @@ class getBoxInfoListForOneImage(nn.Module):
         # Branch for task, there are 2 tasks, that is CONF(Conf), and LOC(LOCation).
         ################# CONF #############################
         predict_CONF = input[0] ## 1,1,h,w
-        predict_CONF = predict_CONF.squezze() ### h,w
+        predict_CONF = torch.sigmoid(predict_CONF)
+        predict_CONF = predict_CONF.squeeze() ### h,w
 
-        box_info_list = self.__get_boxes_info(bboxes=bboxes)
+        box_info_list = self.__get_boxes_info(raw_bboxes=raw_bboxes, bboxes=bboxes)
         for box_info in box_info_list:
             predict_conf = predict_CONF* box_info.positive_points_map
             predict_conf = torch.max(predict_conf)
-            box_info.post_score = predict_conf
+            box_info.post_score = float(predict_conf.cpu().detach().numpy())
         return box_info_list
       
-    def __get_boxes_info(self, bboxes): ###
+    def __get_boxes_info(self, raw_bboxes, bboxes): ###
         ###  bbox[0] x1, bbox[1] y1, bbox[2] x2, bbox[3] y2, bbox[4] class_id, bbox[5] object score (difficult) ###
+        ###  raw_bbox[0] x1, raw_bbox[1] y1, raw_bbox[2] x2, raw_bbox[3] y2, raw_bbox[4] class_id, raw_bbox[5] object score (difficult) ###
         FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
         if len(bboxes) == 0:
             return None
@@ -117,13 +123,13 @@ class getBoxInfoListForOneImage(nn.Module):
 
         sample_position_list = []
 
-        for box_id, bbox in enumerate(bboxes):
+        for box_id, (raw_bbox, bbox) in enumerate(zip(raw_bboxes, bboxes)):
             obj_area = bbox[2] * bbox[3]
             if obj_area == 0:
                 continue
             box_id_list.append(box_id)
             ###  bbox[0] cx, bbox[1] cy, bbox[2] o_w, bbox[3] o_h, bbox[4] class_id, bbox[5] difficult ###
-            box_info_list.append(Box_info(box_id=box_id, bbox=bbox, xyxy=False))
+            box_info_list.append(Box_info(box_id=box_id, bbox=raw_bbox, xyxy=True))
 
             min_wight_index, min_height_index, max_wight_index, max_height_index = min_max_ref_point_index(bbox,self.out_feature_size,self.image_size)
             for i in range(min_height_index, max_height_index+1):

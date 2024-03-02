@@ -11,20 +11,6 @@ from PIL import Image
 import math
 import copy
 
-
-def object_score_to_HElevel(object_score):
-    if object_score>0.75: # easy
-        return 0
-    elif object_score>0.5 and object_score<=0.75: # geneal
-        return 1
-    elif object_score>0.25 and object_score<=0.5: # difficulty
-        return 2
-    elif object_score<=0.25: # very difficulty
-        return 3
-    else:
-        raise print("object_score error: object_score=", object_score)
-
-
 def is_point_in_ellipse(point, ellipse_parameters, guassion_variance):
     point = [point[0]-ellipse_parameters[0],point[1]-ellipse_parameters[1]]
     if ((point[0]**2)/(ellipse_parameters[2]**2) + (point[1]**2)/(ellipse_parameters[3]**2)) < 1:

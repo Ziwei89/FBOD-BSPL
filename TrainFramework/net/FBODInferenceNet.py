@@ -1,6 +1,7 @@
 import torch.nn as nn
 from collections import OrderedDict
 import sys
+import math
 sys.path.append("..")
 from .feature_aggregation.feature_aggregation import ImagesAggregation
 from .feature_extraction.feature_extraction import FeatureExtraction, FeatureExtraction_MultiOutput
@@ -45,6 +46,15 @@ class FBODInferenceBody(nn.Module):
 
         self.FBODetection_head_conf = FBODetection_head([32, 1],32)
         self.FBODetection_head_pos = FBODetection_head([32, 4],32)
+
+        # 进行权值初始化
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
 
     def forward(self, x):

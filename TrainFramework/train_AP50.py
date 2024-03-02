@@ -17,6 +17,8 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from utils.utils import FBObj
 from dataloader.dataset_bbox import CustomDataset, dataset_collate
+from utils.common import load_data_raw_resize_boxes, GetMiddleImg_ModelInput_for_MatImageList
+from utils.get_box_info_list import getBoxInfoListForOneImage, image_info
 from mAP import mean_average_precision
 import copy
 
@@ -25,7 +27,7 @@ def adjust_spl_threshold(step_proportion=0.01):
     if step_proportion <= 0.1:
         return 0.8
     elif step_proportion <= 0.8:
-        return 1-1.25*step_proportion
+        return 0.9143-1.143*step_proportion
     else:
         return 0.
 #---------------------------------------------------#
@@ -138,7 +140,6 @@ def fit_one_epoch(largest_AP_50,net,loss_func_train,loss_func_val,epoch,epoch_si
             pbar.update(1)
     net.train()
     if (epoch+1) >= 30:
-        print("here")
         AP_50,REC_50,PRE_50=mean_average_precision(all_obj_result_list,all_label_obj_list,iou_threshold=0.5)
     else:
         AP_50,REC_50,PRE_50 = 0,0,0
@@ -233,10 +234,15 @@ if __name__ == "__main__":
     
     Cuda = True
 
-    train_annotation_path = "./dataloader/" + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_train.txt"
+    if opt.learn_mode == "SPL" or opt.learn_mode == "SPL_ESP_BC":
+        annotation_root_path = "./variable_score/"
+    else:
+        annotation_root_path = "./dataloader/"
+
+    train_annotation_path = annotation_root_path + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_train.txt"
     train_dataset_image_path = opt.data_root_path + "train/images/"
     
-    val_annotation_path = "./dataloader/" + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_val.txt"
+    val_annotation_path = annotation_root_path + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_val.txt"
     val_dataset_image_path = opt.data_root_path + "val/images/"
     #-------------------------------#
     # 
@@ -280,25 +286,17 @@ if __name__ == "__main__":
     # 建立loss函数
     # dynamic label assign, so the gettargets is ture.
     loss_func_train = LossFunc(num_classes=num_classes, model_input_size=(model_input_size[1], model_input_size[0]), \
-                         learn_mode=opt.learn_mode, assign_method=opt.assign_method, cuda=Cuda, gettargets=True)
+                         learn_mode=opt.learn_mode, cuda=Cuda, gettargets=True)
     
     loss_func_val = LossFunc(num_classes=num_classes, model_input_size=(model_input_size[1], model_input_size[0]), \
-                         learn_mode="general", assign_method=opt.assign_method, cuda=Cuda, gettargets=True)
+                         learn_mode="All_Sample", cuda=Cuda, gettargets=True)
 
 
     # For calculating the AP50
     detect_post_process = FB_Postprocess(batch_size=opt.Batch_size, model_input_size=model_input_size)
     labels_to_results = LablesToResults(batch_size=opt.Batch_size)
 
-    # # 0.2用于验证，0.8用于训练
-    # val_split = 0.1
-    # with open(train_annotation_path) as f:
-    #     lines = f.readlines()
-    # np.random.seed(10101)
-    # np.random.shuffle(lines)
-    # np.random.seed(None)
-    # num_val = int(len(lines)*val_split)
-    # num_train = len(lines) - num_val
+    get_box_info_for_one_image = getBoxInfoListForOneImage(image_size = (model_input_size[1],model_input_size[0])) # image_size w,h
 
     with open(train_annotation_path) as f:
         train_lines = f.readlines()
@@ -335,7 +333,53 @@ if __name__ == "__main__":
 
     largest_AP_50=0
     for epoch in range(start_Epoch,end_Epoch):
-        spl_threshold = adjust_spl_threshold((epoch*1.)/end_Epoch)
+        if opt.learn_mode == "SPL" or opt.learn_mode == "SPL_ESP_BC":
+            spl_threshold = adjust_spl_threshold((epoch*1.)/end_Epoch)
+            net = net.eval()
+            print("Update Object Score")
+            image_info_list = []
+            with tqdm(total=len(train_lines)) as pbar:
+                for line in train_lines:
+                    images, raw_bboxes, bboxes, first_img_name = load_data_raw_resize_boxes(line, train_dataset_image_path, frame_num=opt.input_img_num, image_size=model_input_size)
+                    image_info_instance = image_info(iname=first_img_name)
+                    if len(bboxes) == 0:
+                        image_info_list.append(image_info_instance)
+                        pbar.update(1)
+                        continue
+                    _, model_input= GetMiddleImg_ModelInput_for_MatImageList(images, model_input_size=model_input_size, continus_num=opt.input_img_num, input_mode=opt.input_mode)
+                    with torch.no_grad():
+                        model_input = torch.from_numpy(model_input)
+                        if Cuda:
+                            model_input = model_input.cuda()
+                        predictions = net(model_input)
+                    image_info_instance.box_info_list = get_box_info_for_one_image(predictions, raw_bboxes, bboxes)
+                    image_info_list.append(image_info_instance)
+                    pbar.update(1)
+            
+
+            ### Update the object score of annotation by rewriting all the information.
+            annotation_file = open(train_annotation_path,'w')
+            for image_info_instance in image_info_list:
+                annotation_file.write(image_info_instance.iname)
+                if len(image_info_instance.box_info_list) == 0:
+                    annotation_file.write(" None")
+                else:
+                    for box_info_instance in image_info_instance.box_info_list:
+                        string_label = " " + ",".join(str(int(a)) for a in box_info_instance.bbox) + "," + str(int(box_info_instance.class_id)) + "," + str(box_info_instance.post_score)
+                        annotation_file.write(string_label)
+                annotation_file.write("\n")
+            annotation_file.close()
+            
+            with open(train_annotation_path) as f:
+                train_lines = f.readlines()
+            train_data = CustomDataset(train_lines, (model_input_size[1], model_input_size[0]), image_path=train_dataset_image_path, \
+                                    input_mode=opt.input_mode, continues_num=opt.input_img_num, data_augmentation=opt.data_augmentation)
+            train_dataloader = DataLoader(train_data, batch_size=Batch_size, shuffle=True, num_workers=4, pin_memory=True, collate_fn=dataset_collate)
+
+            net = net.train()
+
+        else:
+            spl_threshold = None
         train_loss, val_loss,largest_AP_50_record, AP_50 = fit_one_epoch(largest_AP_50,net,loss_func_train,loss_func_val,epoch,epoch_size,epoch_size_val,train_dataloader,val_dataloader,
                                                                             end_Epoch,Cuda,save_model_dir, labels_to_results=labels_to_results, detect_post_process=detect_post_process, spl_threshold=spl_threshold)
         largest_AP_50 = largest_AP_50_record

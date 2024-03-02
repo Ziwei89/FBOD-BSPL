@@ -122,6 +122,7 @@ if __name__ == "__main__":
     input_mode=opt.input_mode
     backbone_name = opt.backbone_name
     fusion_method = opt.fusion_method
+    learn_mode = opt.learn_mode
     # assign_method: The label assign method. binary_assign, guassian_assign or auto_assign
     if opt.assign_method == "binary_assign":
         abbr_assign_method = "ba"
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     fb_detector = FB_detector(model_input_size=model_input_size,
                               input_img_num=input_img_num, aggregation_output_channels=aggregation_output_channels,
                               aggregation_method=aggregation_method, input_mode=input_mode, backbone_name=backbone_name, fusion_method=fusion_method,
-                              abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name)
+                              learn_mode=learn_mode, abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name)
     
     annotation_path = "./dataloader/" + "img_label_" + num_to_english_c_dic[input_img_num] + "_continuous_difficulty.txt"
     dataset_image_path = "../images/"
