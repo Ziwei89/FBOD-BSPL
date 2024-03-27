@@ -228,9 +228,11 @@ class getTargets(nn.Module):
                     sample_weight = 1
                 else:
                     sample_weight = 0
-            elif difficult_mode == 2: # spl mode
-                # sample_weight = getSPL_SampleWeight_soft(bbox[5], self.m_root, spl_threshold)
-                sample_weight = getSPL_SampleWeight_hard(bbox[5], spl_threshold)
+            elif difficult_mode == 2: # spl-bc mode
+                sample_weight = getSPL_SampleWeight_soft(bbox[5], self.m_root, spl_threshold)
+                # sample_weight = getSPL_SampleWeight_hard(bbox[5], spl_threshold)
+            elif difficult_mode == 3: # spl/hem mode
+                sample_weight = bbox[5]
             else:
                 raise("Error! difficult_mode error.")
                 

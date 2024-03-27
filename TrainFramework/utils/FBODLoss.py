@@ -71,7 +71,7 @@ class LossFunc(nn.Module): #
         self.cuda = cuda
         self.gettargets = gettargets
     
-    def forward(self, input, targets, spl_threshold):
+    def forward(self, input, targets, spl_threshold=None):
 
         FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
         # targets is bboxes, bbox[0] cx, bbox[1] cy, bbox[2] w, bbox[3] h, bbox[4] class_id, bbox[5] score
@@ -80,8 +80,10 @@ class LossFunc(nn.Module): #
                 targets = self.get_targets(input, targets, difficult_mode=0) ### targets is a list wiht 2 members, each is a 'bs,in_h,in_w,c' format tensor(cls and bbox).
             elif self.learn_mode == "Easy_sample":
                 targets = self.get_targets(input, targets, difficult_mode=1) ### targets is a list wiht 2 members, each is a 'bs,in_h,in_w,c' format tensor(cls and bbox).
-            elif self.learn_mode == "SPL" or self.learn_mode == "SPL_ESP_BC":
+            elif self.learn_mode == "SPLBC":
                 targets = self.get_targets(input, targets, difficult_mode=2, spl_threshold=spl_threshold)
+            elif self.learn_mode == "SPL" or self.learn_mode == "HEM":
+                targets = self.get_targets(input, targets, difficult_mode=3)
             else:
                 raise("Error! learn_mode error.")
 

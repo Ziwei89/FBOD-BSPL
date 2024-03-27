@@ -63,10 +63,19 @@ class opts(object):
         self.parser.add_argument('--cross_vx', default="cross_v1", type=str,
                             help='cross_vx: The Cross Validation data set')
         
-        self.parser.add_argument('--learn_mode', default="SPL", type=str,
-                            help='learn_mode: "All_Sample", "Easy_sample" and "SPL". "All_Sample": means to train the model with all sample, \
-                                 "Easy_sample": means using the easy samples to the model, "SPL": means self-pace learning approach to model training, \
-                                    "SPL_ESP_BC": means the spl with easy sample prior based on confierence.')
+        self.parser.add_argument('--learn_mode', default="SPLBC", type=str,
+                            help='learn_mode: "All_Sample", "Easy_sample", "SPLBC", "SPL", and "HEM". \
+                                 "All_Sample": means to train the model with all sample, \
+                                 "Easy_sample": means using the easy samples to the model, \
+                                 "SPLBC": means the spl based on confierence, \
+                                 "SPL": means self-pace learning approach to model training, \
+                                 "HEM": means hard example mining.')
+        
+        self.parser.add_argument('--spl_mode', default="hard", type=str,
+                            help='spl_mode: "hard", "linear", "logarithmic". \
+                                 "hard": hard regularizer, \
+                                 "linear": soft regularizer with linear, \
+                                 "logarithmic": soft regularizer with logarithmic.')
         
         ######### for test
         self.parser.add_argument('--model_name', default="FB_object_detect_model.pth", type=str,

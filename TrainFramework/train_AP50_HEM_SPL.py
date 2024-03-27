@@ -18,30 +18,53 @@ import matplotlib.pyplot as plt
 from utils.utils import FBObj
 from dataloader.dataset_bbox import CustomDataset, dataset_collate
 from utils.common import load_data_raw_resize_boxes, GetMiddleImg_ModelInput_for_MatImageList
-from utils.get_box_info_list import getBoxInfoListForOneImage, image_info
+from utils.get_box_info_list import getBoxInfoListForOneImage_Loss, image_info
 from mAP import mean_average_precision
 import copy
+import math
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 def adjust_spl_threshold(step_proportion=0.01):
     """
     spl_threshold
-        |
-        |_0.8
-        | :\ 
-        | :  \
-        | :    \
-        | :      \
-        | :        \
-        |_:__________\_______ Step_proportion
+        |_____________1
+        |           /:
+        |         /  :
+        |       /    :
+        |     /      :
+        |   /        :
+    0.2 |_/          :
+        |_:__________:______ Step_proportion
          0.1         0.9
     """
     if step_proportion <= 0.1:
-        return 0.8
+        return 0.2
     elif step_proportion <= 0.9:
-        return 0.9-step_proportion
+        return step_proportion + 0.1
     else:
-        return 0.
+        return 1.
+
+
+def spl_sampleWeight_Hard(sample_loss, spl_threshold):
+    if sample_loss < spl_threshold:
+        return 1
+    else:
+        return 0
+
+def spl_sampleWeight_Linear(sample_loss, spl_threshold):
+    if sample_loss < spl_threshold:
+        return (1 - sample_loss/spl_threshold)
+    else:
+        return 0
+
+def spl_sampleWeight_Logarithmic(sample_loss, spl_threshold):
+    if sample_loss < spl_threshold:
+        parameter2 = 1- spl_threshold
+        weight = (math.log(sample_loss + parameter2)/math.log(parameter2))
+        return weight
+    else:
+        return 0
+
 #---------------------------------------------------#
 #   获得类
 #---------------------------------------------------#
@@ -74,7 +97,7 @@ class LablesToResults(object):
         return label_obj_list
 
 def fit_one_epoch(largest_AP_50,net,loss_func_train,loss_func_val,epoch,epoch_size,epoch_size_val,gen,genval,
-                  Epoch,cuda,save_model_dir,labels_to_results,detect_post_process,spl_threshold):
+                  Epoch,cuda,save_model_dir,labels_to_results,detect_post_process):
     total_loss = 0
     val_loss = 0
     start_time = time.time()
@@ -99,7 +122,7 @@ def fit_one_epoch(largest_AP_50,net,loss_func_train,loss_func_val,epoch,epoch_si
                     targets = [Variable(torch.from_numpy(fature_label).type(torch.FloatTensor)) for fature_label in targets] ##
             optimizer.zero_grad()
             outputs = net(images)
-            loss = loss_func_train(outputs, targets, spl_threshold)
+            loss = loss_func_train(outputs, targets)
             loss.backward()
             optimizer.step()
 
@@ -138,7 +161,7 @@ def fit_one_epoch(largest_AP_50,net,loss_func_train,loss_func_val,epoch,epoch_si
                     targets_val = [Variable(torch.from_numpy(fature_label).type(torch.FloatTensor)) for fature_label in targets_val] ##
                 optimizer.zero_grad()
                 outputs = net(images_val)
-                loss = loss_func_val(outputs, targets_val, spl_threshold)
+                loss = loss_func_val(outputs, targets_val)
                 val_loss += loss
 
                 if (epoch+1) >= 30:
@@ -246,8 +269,10 @@ if __name__ == "__main__":
     
     Cuda = True
 
-    if opt.learn_mode == "SPLBC":
-        annotation_root_path = "./variable_score/"
+    if opt.learn_mode == "SPL":
+        annotation_root_path = "./variable_weight/"
+    elif opt.learn_mode == "HEM":
+        annotation_root_path = "./variable_weight_HEM/"
     else:
         annotation_root_path = "./dataloader/"
 
@@ -308,7 +333,8 @@ if __name__ == "__main__":
     detect_post_process = FB_Postprocess(batch_size=opt.Batch_size, model_input_size=model_input_size)
     labels_to_results = LablesToResults(batch_size=opt.Batch_size)
 
-    get_box_info_for_one_image = getBoxInfoListForOneImage(image_size = (model_input_size[1],model_input_size[0])) # image_size w,h
+    get_box_info_for_one_image = getBoxInfoListForOneImage_Loss(num_classes=num_classes, image_size = (model_input_size[1],model_input_size[0]),
+                                                                scale=opt.scale_factor, cuda=Cuda) # image_size w,h
 
     with open(train_annotation_path) as f:
         train_lines = f.readlines()
@@ -345,10 +371,9 @@ if __name__ == "__main__":
 
     largest_AP_50=0
     for epoch in range(start_Epoch,end_Epoch):
-        if opt.learn_mode == "SPLBC":
-            spl_threshold = adjust_spl_threshold((epoch*1.)/end_Epoch)
+        if opt.learn_mode == "SPL" or opt.learn_mode == "HEM":
             net = net.eval()
-            print("Update Object Score")
+            print("Update Object Loss")
             image_info_list = []
             with tqdm(total=len(train_lines)) as pbar:
                 for line in train_lines:
@@ -364,22 +389,57 @@ if __name__ == "__main__":
                         if Cuda:
                             model_input = model_input.cuda()
                         predictions = net(model_input)
+                    ### sample loss
                     image_info_instance.box_info_list = get_box_info_for_one_image(predictions, raw_bboxes, bboxes)
                     image_info_list.append(image_info_instance)
                     pbar.update(1)
             
 
-            ### Update the object score of annotation by rewriting all the information.
+            ### Update the object weight by rewriting all the information.
             annotation_file = open(train_annotation_path,'w')
-            for image_info_instance in image_info_list:
-                annotation_file.write(image_info_instance.iname)
-                if len(image_info_instance.box_info_list) == 0:
-                    annotation_file.write(" None")
-                else:
-                    for box_info_instance in image_info_instance.box_info_list:
-                        string_label = " " + ",".join(str(int(a)) for a in box_info_instance.bbox) + "," + str(int(box_info_instance.class_id)) + "," + str(box_info_instance.post_score)
-                        annotation_file.write(string_label)
-                annotation_file.write("\n")
+            if opt.learn_mode == "SPL":
+                spl_threshold = adjust_spl_threshold((epoch*1.)/end_Epoch)
+                for image_info_instance in image_info_list:
+                    annotation_file.write(image_info_instance.iname)
+                    if len(image_info_instance.box_info_list) == 0:
+                        annotation_file.write(" None")
+                    else:
+                        for box_info_instance in image_info_instance.box_info_list:
+                            if opt.spl_mode == "hard":
+                                sample_weight = spl_sampleWeight_Hard(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
+                            elif opt.spl_mode == "linear":
+                                sample_weight = spl_sampleWeight_Linear(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
+                            elif opt.spl_mode == "logarithmic":
+                                sample_weight = spl_sampleWeight_Logarithmic(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
+                            else:
+                                raise("Error, no such spl mode.")
+                            string_label = " " + ",".join(str(int(a)) for a in box_info_instance.bbox) + "," + str(int(box_info_instance.class_id)) + "," + str(sample_weight)
+                            annotation_file.write(string_label)
+                    annotation_file.write("\n")
+            elif opt.learn_mode == "HEM":
+                sample_loss_list = []
+                for image_info_instance in image_info_list:
+                    if len(image_info_instance.box_info_list) == 0:
+                        continue
+                    else:
+                        for box_info_instance in image_info_instance.box_info_list:
+                            sample_loss_list.append(box_info_instance.sample_loss)
+                sample_loss_list.sort(reverse=True)
+                loss_threshold = sample_loss_list[int(len(sample_loss_list) * 0.7)]
+
+                for image_info_instance in image_info_list:
+                    annotation_file.write(image_info_instance.iname)
+                    if len(image_info_instance.box_info_list) == 0:
+                        annotation_file.write(" None")
+                    else:
+                        for box_info_instance in image_info_instance.box_info_list:
+                            if box_info_instance.sample_loss >= loss_threshold:
+                                sample_weight = 1
+                            else:
+                                sample_weight = 0
+                            string_label = " " + ",".join(str(int(a)) for a in box_info_instance.bbox) + "," + str(int(box_info_instance.class_id)) + "," + str(sample_weight)
+                            annotation_file.write(string_label)
+                    annotation_file.write("\n")
             annotation_file.close()
             
             with open(train_annotation_path) as f:
@@ -390,10 +450,8 @@ if __name__ == "__main__":
 
             net = net.train()
 
-        else:
-            spl_threshold = None
         train_loss, val_loss,largest_AP_50_record, AP_50 = fit_one_epoch(largest_AP_50,net,loss_func_train,loss_func_val,epoch,epoch_size,epoch_size_val,train_dataloader,val_dataloader,
-                                                                            end_Epoch,Cuda,save_model_dir, labels_to_results=labels_to_results, detect_post_process=detect_post_process, spl_threshold=spl_threshold)
+                                                                            end_Epoch,Cuda,save_model_dir, labels_to_results=labels_to_results, detect_post_process=detect_post_process)
         largest_AP_50 = largest_AP_50_record
         if (epoch+1)>=2:
             draw_curve_loss(epoch+1, train_loss.item(), val_loss.item(), log_pic_name_loss)
