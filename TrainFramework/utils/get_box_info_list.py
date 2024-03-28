@@ -228,7 +228,9 @@ class LossFuncForOneImage(nn.Module): #
 
         FloatTensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
         # bboxes, bbox[0] cx, bbox[1] cy, bbox[2] w, bbox[3] h, bbox[4] class_id, bbox[5] score
-        targets = self.get_targets(input, bboxes, difficult_mode=0) ### targets is a list wiht 2 members, each is a 'bs,in_h,in_w,c' format tensor(cls and bbox).
+        bboxes_bs = torch.from_numpy(bboxes).type(FloatTensor)
+        bboxes_bs = bboxes_bs.unsqueeze(0)
+        targets = self.get_targets(input, bboxes_bs, difficult_mode=0) ### targets is a list wiht 2 members, each is a 'bs,in_h,in_w,c' format tensor(cls and bbox).
 
         # input is a list with with 2 members(CONF and LOC), each member is a 'bs,c,in_h,in_w' format tensor).
         bs = input[0].size(0)

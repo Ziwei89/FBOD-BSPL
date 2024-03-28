@@ -373,7 +373,7 @@ if __name__ == "__main__":
     for epoch in range(start_Epoch,end_Epoch):
         if opt.learn_mode == "SPL" or opt.learn_mode == "HEM":
             net = net.eval()
-            print("Update Object Loss")
+            print("Update Object Weight")
             image_info_list = []
             with tqdm(total=len(train_lines)) as pbar:
                 for line in train_lines:
