@@ -76,7 +76,7 @@ if __name__ == "__main__":
         height, width, _ = frame.shape
         raw_image_shape = np.array([height, width])
     
-    Save_video_name = "./test_output/" + video_name.split(".")[0] + "_SS_out.mp4"
+    Save_video_name = "./test_output/" + video_name.split(".")[0] + "_SPL-linear_out.mp4"
     fps = 25
 
     video_dir = os.path.join("./", Save_video_name)
@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
                 detect_bboxes = outputs[0][:,:4]
                 for box in detect_bboxes:
-                    cv2.rectangle(image_opencv,(int(box[0]),int(box[1])),(int(box[2]),int(box[3])),(0,255,0),2)#x1,y1,x2,y2
+                    cv2.rectangle(image_opencv,(int(box[0]),int(box[1])),(int(box[2]),int(box[3])),(255,255,0),2)#x1,y1,x2,y2
                 # for label_box in label_bboxes:
                 #     cv2.rectangle(image_opencv,(int(label_box[0]),int(label_box[1])),(int(label_box[2]),int(label_box[3])),(0,255,0),2)#x1,y1,x2,y2
                 videowriter.write(image_opencv)

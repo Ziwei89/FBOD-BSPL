@@ -60,7 +60,7 @@ def spl_sampleWeight_Linear(sample_loss, spl_threshold):
 def spl_sampleWeight_Logarithmic(sample_loss, spl_threshold):
     if sample_loss < spl_threshold:
         parameter2 = 1- spl_threshold
-        weight = (math.log(sample_loss + parameter2)/math.log(parameter2))
+        weight = (math.log(sample_loss + parameter2)/math.log(parameter2+0.01))
         return weight
     else:
         return 0
@@ -425,7 +425,7 @@ if __name__ == "__main__":
                         for box_info_instance in image_info_instance.box_info_list:
                             sample_loss_list.append(box_info_instance.sample_loss)
                 sample_loss_list.sort(reverse=True)
-                loss_threshold = sample_loss_list[int(len(sample_loss_list) * 0.7)]
+                loss_threshold = sample_loss_list[int(len(sample_loss_list) * 0.4)]
 
                 for image_info_instance in image_info_list:
                     annotation_file.write(image_info_instance.iname)
