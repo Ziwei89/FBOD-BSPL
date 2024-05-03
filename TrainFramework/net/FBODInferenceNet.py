@@ -5,6 +5,7 @@ import math
 sys.path.append("..")
 from .feature_aggregation.feature_aggregation import ImagesAggregation
 from .feature_extraction.feature_extraction import FeatureExtraction, FeatureExtraction_MultiOutput
+from utils.feature_map_visualization import show_out_feature_map
 
 def conv2d(filter_in, filter_out, kernel_size, stride=1):
     pad = (kernel_size - 1) // 2 if kernel_size else 0
@@ -47,6 +48,8 @@ class FBODInferenceBody(nn.Module):
         self.FBODetection_head_conf = FBODetection_head([32, 1],32)
         self.FBODetection_head_pos = FBODetection_head([32, 4],32)
 
+        self.temp_i=0
+
         # 进行权值初始化
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -64,6 +67,9 @@ class FBODInferenceBody(nn.Module):
 
         conf = self.FBODetection_head_conf(out1) # output channels = 1
         pos = self.FBODetection_head_pos(out1) # output channels = 4
+        # img_name = "bird_107_feature_map_" + str(self.temp_i) + ".png"
+        # show_out_feature_map(conf, img_name=img_name)
+        # self.temp_i += 1
 
         return conf, pos
 
