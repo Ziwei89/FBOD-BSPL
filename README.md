@@ -41,7 +41,7 @@ cd TrainFramework
 python train_AP50.py \
         --learn_mode=Easy_sample \
         --Add_name=20240102
-cd .
+cd ../
 ```
 
 * 简单样本训练策略： 
@@ -51,8 +51,8 @@ python train_AP50.py \
         --learn_mode=SPLBC \
         --pretrain_model_path=./logs/five/384_672/RGB_relatedatten_cspdarknet53_concat_Easy_Sample_aa_20240102/FB_object_detect_model.pth \
         --Add_name=20240104
-cd .
-
+cd ../
+```
 * 普通自步学习策略 
 ```
 cd TrainFramework
@@ -60,7 +60,7 @@ python train_AP50.py \
         --learn_mode=SPL \
         --spl_mode=hard \
         --Add_name=20240104
-cd .
+cd ../
 ```
 
 ## 未完待续...
