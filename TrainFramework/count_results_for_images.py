@@ -1,4 +1,3 @@
-import cv2
 import os
 from FB_detector import FB_detector
 from utils.common import load_data, GetMiddleImg_ModelInput_for_MatImageList
@@ -78,7 +77,7 @@ if __name__ == "__main__":
                               learn_mode=learn_mode, abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name)
     Cuda = True
     annotation_path = "./dataloader/" + "img_label_" + num_to_english_c_dic[input_img_num] + "_continuous_difficulty_val.txt"
-    dataset_image_path = opt.data_root_path + "val/images/"
+    dataset_image_path = opt.data_root_path + "images/val/"
 
     GT_difficulty_obj_count = [0,0,0,0]
     PD_difficulty_obj_count = [0,0,0,0,0]

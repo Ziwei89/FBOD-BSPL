@@ -53,8 +53,8 @@ if __name__ == "__main__":
     Add_name=opt.Add_name
     model_name=opt.model_name
     
-    video_path = opt.data_root_path + "val/video/"
-    label_path = opt.data_root_path + "val/labels/" #.xlm label file path
+    video_path = opt.data_root_path + "video/val/"
+    label_path = opt.data_root_path + "labels/val/" #.xlm label file path
     label_name_list=os.listdir(label_path)
 
     video_name = opt.video_name
@@ -69,13 +69,12 @@ if __name__ == "__main__":
                               aggregation_method=aggregation_method, input_mode=input_mode, backbone_name=backbone_name, fusion_method=fusion_method,
                               learn_mode=learn_mode, abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name)
     cap=cv2.VideoCapture(video_path + video_name)
-    ret,frame=cap.read()
-    if ret != True:
-        raise("Read video error.")
-    else:
-        height, width, _ = frame.shape
-        raw_image_shape = np.array([height, width])
-    
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    raw_image_shape = np.array([height, width])
+
     Save_video_name = "./test_output/" + video_name.split(".")[0] + "_SPL-linear_out.mp4"
     fps = 25
 
@@ -84,6 +83,14 @@ if __name__ == "__main__":
 
     image_q = Queue(maxsize=input_img_num)
     cap=cv2.VideoCapture(video_path + video_name)
+
+    ################# frames padding ################
+    for i in range(int(input_img_num/2)):
+        black_image = np.zeros((height, width, 3), dtype=np.uint8)
+        black_image = Image.fromarray(cv2.cvtColor(black_image,cv2.COLOR_BGR2RGB))
+        image_q.put(black_image)
+    #################################################
+
     frame_id = 0
 
     while (True):
@@ -94,12 +101,12 @@ if __name__ == "__main__":
             frame_id += 1
             image = Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
             image_q.put(image)
-            if frame_id >= input_img_num:
+            if frame_id >= int(input_img_num/2) + 1 and frame_id <= frame_count:
 
-                ### The output of first stage is start from continus_num-int(continus_num/2) frame.
-                # frame_id_str = "%05d" % int(frame_id-int(continus_num/2))
-                frame_id_str = "%05d" % int((frame_id-1)-int(input_img_num/2)) #The frame id in dataset start from 0, but this script start from 1.
+                ### The output of first stage is start from first frame.
+                frame_id_str = "%06d" % int(frame_id-1) #The frame id in dataset start from 0, but this script start from 1.
                 label_name = video_name.split(".")[0] + "_" + frame_id_str + ".xml"
+
                 label_bboxes = []
                 if label_name in label_name_list:
                     label_bboxes = ConvertAnnotationLabelToBboxes(label_path + label_name)
@@ -117,4 +124,28 @@ if __name__ == "__main__":
                 # for label_box in label_bboxes:
                 #     cv2.rectangle(image_opencv,(int(label_box[0]),int(label_box[1])),(int(label_box[2]),int(label_box[3])),(0,255,0),2)#x1,y1,x2,y2
                 videowriter.write(image_opencv)
+            if frame_id == frame_count: ## Output the detection results of the last int(continus_num/2) frames of the video.
+                for n in range(1, int(input_img_num/2)+1):
+                    black_image = np.zeros((height, width, 3), dtype=np.uint8)
+                    black_image = Image.fromarray(cv2.cvtColor(black_image,cv2.COLOR_BGR2RGB))
+                    image_q.put(black_image)
+
+                    frame_id_str = "%06d" % int((frame_id-1) - (int(input_img_num/2)-n)) #The frame id in dataset start from 0, but this script start from 1.
+                    label_name = video_name.split(".")[0] + "_" + frame_id_str + ".xml"
+                    label_bboxes = []
+                    if label_name in label_name_list:
+                        label_bboxes = ConvertAnnotationLabelToBboxes(label_path + label_name)
+                    
+                    middle_img_, model_input = GetMiddleImg_ModelInput(image_q, model_input_size=model_input_size, continus_num=input_img_num, input_mode=input_mode)
+                    write_img = copy.copy(middle_img_)
+                    image_opencv = cv2.cvtColor(np.asarray(write_img),cv2.COLOR_RGB2BGR) 
+                    _ = image_q.get()
+                    outputs = fb_detector.detect_image(model_input, raw_image_shape=raw_image_shape)
+
+                    detect_bboxes = outputs[0][:,:4]
+                    for box in detect_bboxes:
+                        cv2.rectangle(image_opencv,(int(box[0]),int(box[1])),(int(box[2]),int(box[3])),(0,0,255),2)#x1,y1,x2,y2
+                    for label_box in label_bboxes:
+                        cv2.rectangle(image_opencv,(int(label_box[0]),int(label_box[1])),(int(label_box[2]),int(label_box[3])),(0,255,0),2)#x1,y1,x2,y2
+                    videowriter.write(image_opencv)
     videowriter.release()

@@ -144,7 +144,19 @@ if __name__ == "__main__":
     for video_name in video_names:
         image_q = Queue(maxsize=continus_num)
         start_image_total_id = image_total_id
+
         cap=cv2.VideoCapture(video_path + video_name)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        ################# frames padding ################
+        for i in range(int(continus_num/2)):
+            black_image = np.zeros((height, width, 3), dtype=np.uint8)
+            black_image = Image.fromarray(cv2.cvtColor(black_image,cv2.COLOR_BGR2RGB))
+            image_q.put(black_image)
+        #################################################
+
         frame_id = 0
         while (True):
             ret,frame=cap.read()
@@ -158,23 +170,13 @@ if __name__ == "__main__":
                 image_shape = np.array(np.shape(image)[0:2]) # image size is 1280,720; image array's shape is 720,1280
                 img_width = int(image_shape[1])
                 img_heigth = int(image_shape[0])
-                # print("image_shape:")
-                # print(image_shape)
-                if frame_id >= continus_num:
+                
+                frame_id_str = "%06d" % int((frame_id-1))
+                label_name = video_name.split(".")[0] + "_" + frame_id_str + ".xml"
+                all_label_obj_list.append(Convert_Annotation_coco_Label(label_path + label_name, start_image_total_id + frame_id))
 
-                    exist_label = False
-                    ### The output of first stage is start from continus_num-int(continus_num/2) frame.
-                    # frame_id_str = "%06d" % int(frame_id-int(continus_num/2))
-                    frame_id_str = "%06d" % int((frame_id-1)-int(continus_num/2)) #The frame id in dataset start from 0, but this script start from 1.
-                    label_name = video_name.split(".")[0] + "_" + frame_id_str + ".xml"
-                    if label_name in label_name_list:
-                        exist_label = True
-                        all_label_obj_list.append(Convert_Annotation_coco_Label(label_path + label_name, start_image_total_id + (frame_id-int(continus_num/2))))
+                if frame_id >= int(continus_num/2) + 1 and frame_id <= frame_count:
 
-                    # If there's no label for the middle frame of this input quene, continue this detection.
-                    if exist_label == False:
-                        _ = image_q.get()
-                        continue
                     _, model_input = GetMiddleImg_ModelInput(image_q, model_input_size=model_input_size, continus_num=continus_num, input_mode=input_mode)
                     _ = image_q.get()
                     outputs = fb_detector.detect_image(model_input, raw_image_shape=image_shape)
@@ -193,6 +195,32 @@ if __name__ == "__main__":
                         ### The output of detector is start from continus_num-int(continus_num/2) frame.
                         obj_result_list.append(FBObj(score=score, image_id=start_image_total_id + (frame_id-int(continus_num/2)), bbox=box))
                     all_obj_result_list += obj_result_list
+                if frame_id == frame_count: ## Output the detection results of the last int(continus_num/2) frames of the video.
+                    for n in range(1, int(continus_num/2)+1):
+                        
+                        black_image = np.zeros((height, width, 3), dtype=np.uint8)
+                        black_image = Image.fromarray(cv2.cvtColor(black_image,cv2.COLOR_BGR2RGB))
+                        image_q.put(black_image)
+
+                        _, model_input = GetMiddleImg_ModelInput(image_q, model_input_size=model_input_size, continus_num=continus_num, input_mode=input_mode)
+                        _ = image_q.get()
+                        outputs = fb_detector.detect_image(model_input, raw_image_shape=image_shape)
+
+                        obj_result_list = []
+                        for output in outputs[0]: ###
+                            # print(output)
+                            box = [0,0,0,0]
+                            box[0] = output[0].item()
+                            box[1] = output[1].item()
+                            box[2] = output[2].item()
+                            box[3] = output[3].item()
+                            # print("predict:")
+                            # print(box)
+                            score = output[4].item()
+                            ### The output of detector is delayed by int(continus_num/2) frames.
+                            obj_result_list.append(FBObj(score=score, image_id=start_image_total_id + (frame_id-(int(continus_num/2)-n)), bbox=box))
+                        all_obj_result_list += obj_result_list
+                        
     label_json_file = "./instances_test2017.json"
     movingobj_to_coco_label(all_label_obj_list, label_json_file, width=img_width, height=img_heigth)
     
