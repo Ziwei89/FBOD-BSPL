@@ -24,6 +24,7 @@ git clone https://github.com/Ziwei89/FBOD-BSPL.git
 
 相关参数解释如下(在设置时请参考TrainFramework/config/opts.py文件)：  
 ```
+data_root_path                     #数据集根路径
 pretrain_model_path                #预训练模型的路径。在置信度的简单样本先验自步学习策略，需使用简单样本训练策略训练的模型
 Add_name                           #在相关记录文件(如模型保存文件夹或训练记录图片)，增加后缀
 learn_mode                         #模型学习策略：
@@ -39,6 +40,7 @@ spl_mode                            #自步学习正则化器，普通自步学�
 ```
 cd TrainFramework
 python train_AP50.py \
+        --data_root_path=../dataset/FBD-SV-2024/ \
         --learn_mode=Easy_sample \
         --Add_name=20240102
 cd ../
@@ -48,6 +50,7 @@ cd ../
 ```
 cd TrainFramework
 python train_AP50.py \
+        --data_root_path=../dataset/FBD-SV-2024/ \
         --learn_mode=SPLBC \
         --pretrain_model_path=./logs/five/384_672/RGB_relatedatten_cspdarknet53_concat_Easy_Sample_aa_20240102/FB_object_detect_model.pth \
         --Add_name=20240104
@@ -57,10 +60,19 @@ cd ../
 ```
 cd TrainFramework
 python train_AP50.py \
+        --data_root_path=../dataset/FBD-SV-2024/ \
         --learn_mode=SPL \
         --spl_mode=hard \
         --Add_name=20240104
 cd ../
 ```
-
-## 未完待续...
+## 4、测试模型检测性能（测试模型时，参数设置要和对应模型训练时的参数一致）
+```
+cd TrainFramework
+python mAP_for_AllVideo_coco_tools.py \
+        --data_root_path=../dataset/FBD-SV-2024/ \
+        --learn_mode=SPLBC \
+        --Add_name=20240104 \
+        --model_name=FB_object_detect_model.pth
+cd ../
+```
