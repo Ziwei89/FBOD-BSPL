@@ -46,7 +46,7 @@ python train_AP50.py \
 cd ../
 ```
 
-* 简单样本训练策略： 
+* 基于置信度的自步学习训练策略： 
 ```
 cd TrainFramework
 python train_AP50.py \
@@ -59,7 +59,7 @@ cd ../
 * 普通自步学习策略 
 ```
 cd TrainFramework
-python train_AP50.py \
+python train_AP50_HEM_SPL.py \
         --data_root_path=../dataset/FBD-SV-2024/ \
         --learn_mode=SPL \
         --spl_mode=hard \
