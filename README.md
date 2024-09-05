@@ -101,6 +101,7 @@ spl_mode                            #自步学习正则化器，普通自步学�
 ```
 cd TrainFramework
 python train_AP50.py \
+        --data_augmentation=True \
         --data_root_path=../dataset/FBD-SV-2024/ \
         --learn_mode=Easy_sample \
         --Add_name=20240102
@@ -111,6 +112,7 @@ cd ../
 ```
 cd TrainFramework
 python train_AP50.py \
+        --data_augmentation=True \
         --data_root_path=../dataset/FBD-SV-2024/ \
         --learn_mode=SPLBC \
         --pretrain_model_path=./logs/five/384_672/RGB_relatedatten_cspdarknet53_concat_Easy_Sample_aa_20240102/FB_object_detect_model.pth \
@@ -121,6 +123,7 @@ cd ../
 ```
 cd TrainFramework
 python train_AP50_HEM_SPL.py \
+        --data_augmentation=True \
         --data_root_path=../dataset/FBD-SV-2024/ \
         --learn_mode=SPL \
         --spl_mode=hard \
