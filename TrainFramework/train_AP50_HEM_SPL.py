@@ -271,16 +271,18 @@ if __name__ == "__main__":
 
     if opt.learn_mode == "SPL":
         annotation_root_path = "./variable_weight/"
+        os.makedirs(annotation_root_path, exist_ok=True)
     elif opt.learn_mode == "HEM":
         annotation_root_path = "./variable_weight_HEM/"
+        os.makedirs(annotation_root_path, exist_ok=True)
     else:
         annotation_root_path = "./dataloader/"
 
     train_annotation_path = annotation_root_path + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_train.txt"
-    train_dataset_image_path = opt.data_root_path + "train/images/"
+    train_dataset_image_path = opt.data_root_path + "images/train/"
     
-    val_annotation_path = annotation_root_path + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_val.txt"
-    val_dataset_image_path = opt.data_root_path + "val/images/"
+    val_annotation_path = "./dataloader/img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_val.txt"
+    val_dataset_image_path = opt.data_root_path + "images/val/"
     #-------------------------------#
     # 
     #-------------------------------#

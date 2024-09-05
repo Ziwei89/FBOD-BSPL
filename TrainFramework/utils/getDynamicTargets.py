@@ -97,7 +97,7 @@ class getTargets(nn.Module):
     def forward(self, input, bboxes_bs, difficult_mode, spl_threshold=None):
         # input is a [CONF, LOC] list with 'bs,c,h,w' format tensor.
         # bboxes is a bs list with 'n,c' tensor, n is the num of box.
-        # difficult_mode # 0 means no difficult difference, 1 means simple sample only.
+        # difficult_mode # 0 means no difficult difference, 1 means easy sample only.
         targets = [] ### targets is a list wiht 2 members, each is a 'bs,h,w,c' format tensor(cls and bbox).
         targets_cls = []
         targets_loc = []
@@ -223,7 +223,7 @@ class getTargets(nn.Module):
 
             if difficult_mode == 0: # no difficulty different
                 sample_weight = 1
-            elif difficult_mode == 1: # simple sample only
+            elif difficult_mode == 1: # Easy sample only
                 if bbox[5] >= 0.625:
                     sample_weight = 1
                 else:
