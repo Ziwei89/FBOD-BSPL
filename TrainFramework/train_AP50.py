@@ -21,6 +21,7 @@ from utils.common import load_data_raw_resize_boxes, GetMiddleImg_ModelInput_for
 from utils.get_box_info_list import getBoxInfoListForOneImage, image_info
 from mAP import mean_average_precision
 import copy
+import shutil
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 def adjust_spl_threshold(step_proportion=0.01):
@@ -254,6 +255,8 @@ if __name__ == "__main__":
 
     train_annotation_path = annotation_root_path + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_train.txt"
     train_dataset_image_path = opt.data_root_path + "images/train/"
+    if not os.path.exists(train_annotation_path):
+        shutil.copy("./dataloader/img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_train.txt", train_annotation_path)
     
     val_annotation_path = "./dataloader/img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_val.txt"
     val_dataset_image_path = opt.data_root_path + "images/val/"
