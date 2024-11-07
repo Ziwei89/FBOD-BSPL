@@ -170,14 +170,14 @@ class LossFunc(nn.Module): #
         bs_obj_nums = torch.sum(weight_pos, dim=(1,2))
         
         #################LOC
-        label_LOC_difficult_lamda = targets[1].type(FloatTensor) #bs*in_h,in_w*c  c=6(cx,xy,o_w,o_h,difficult,lamda)
-        label_LOC_difficult_lamda = label_LOC_difficult_lamda.view(bs,in_h,in_w,-1) # bs,in_h,in_w,c(c=6)
+        label_LOC_sampleweight_lamda = targets[1].type(FloatTensor) #bs*in_h,in_w*c  c=6(cx,xy,o_w,o_h,difficult,lamda)
+        label_LOC_sampleweight_lamda = label_LOC_sampleweight_lamda.view(bs,in_h,in_w,-1) # bs,in_h,in_w,c(c=6)
         ### bs, in_h, in_w, c(c=4 cx,xy,o_w,o_h)
-        label_LOC = label_LOC_difficult_lamda[:,:,:,:4] # bs,in_h,in_w,c(c=4)
+        label_LOC = label_LOC_sampleweight_lamda[:,:,:,:4] # bs,in_h,in_w,c(c=4)
         ### bs, in_h, in_w
-        label_difficult = label_LOC_difficult_lamda[:,:,:,4] # bs,in_h,in_w
+        label_sampleweight = label_LOC_sampleweight_lamda[:,:,:,4] # bs,in_h,in_w
         ### bs, in_h, in_w
-        # label_lamda = label_LOC_difficult_lamda[:,:,:,5] # bs,in_h,in_w
+        # label_lamda = label_LOC_sampleweight_lamda[:,:,:,5] # bs,in_h,in_w
 
         ## Conf Loss
         ## bs, in_h, in_w
@@ -185,7 +185,7 @@ class LossFunc(nn.Module): #
         # print(predict_CONF[predict_CONF>0.2])
         MSE_Loss = MSELoss(label_CONF, predict_CONF)
         neg_MSE_Loss = MSE_Loss * weight_neg
-        pos_MSE_Loss = (MSE_Loss * label_difficult) * weight_pos
+        pos_MSE_Loss = (MSE_Loss * label_sampleweight) * weight_pos
 
         CONF_loss = 0
         for b in range(bs):
@@ -208,7 +208,7 @@ class LossFunc(nn.Module): #
         ### Locate Loss
         ciou_loss = 1-box_ciou(predict_LOC, label_LOC)
         ###(bs, in_h, in_w)
-        ciou_loss = (ciou_loss.view(bs,in_h,in_w)) * label_difficult * weight_pos
+        ciou_loss = (ciou_loss.view(bs,in_h,in_w)) * label_sampleweight * weight_pos
         LOC_loss = 0
         for b in range(bs):
             LOC_loss_per_batch = 0
@@ -375,14 +375,14 @@ class LossFuncM(nn.Module): #
         bs_obj_nums = torch.sum(weight_pos, dim=(1,2))
         
         #################LOC
-        label_LOC_difficult_lamda = targets[1].type(FloatTensor) #bs*in_h,in_w*c  c=6(cx,xy,o_w,o_h,difficult,lamda)
-        label_LOC_difficult_lamda = label_LOC_difficult_lamda.view(bs,in_h,in_w,-1) # bs,in_h,in_w,c(c=6)
+        label_LOC_sampleweight_lamda = targets[1].type(FloatTensor) #bs*in_h,in_w*c  c=6(cx,xy,o_w,o_h,difficult,lamda)
+        label_LOC_sampleweight_lamda = label_LOC_sampleweight_lamda.view(bs,in_h,in_w,-1) # bs,in_h,in_w,c(c=6)
         ### bs, in_h, in_w, c(c=4 cx,xy,o_w,o_h)
-        label_LOC = label_LOC_difficult_lamda[:,:,:,:4] # bs,in_h,in_w,c(c=4)
+        label_LOC = label_LOC_sampleweight_lamda[:,:,:,:4] # bs,in_h,in_w,c(c=4)
         ### bs, in_h, in_w
-        # label_difficult = label_LOC_difficult_lamda[:,:,:,4] # bs,in_h,in_w
+        # label_sampleweight = label_LOC_sampleweight_lamda[:,:,:,4] # bs,in_h,in_w
         ### bs, in_h, in_w
-        # label_lamda = label_LOC_difficult_lamda[:,:,:,5] # bs,in_h,in_w
+        # label_lamda = label_LOC_sampleweight_lamda[:,:,:,5] # bs,in_h,in_w
 
         ## Guassian Conf Loss
         ## bs, in_h, in_w
