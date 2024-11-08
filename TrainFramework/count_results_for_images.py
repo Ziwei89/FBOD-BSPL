@@ -63,7 +63,10 @@ if __name__ == "__main__":
     else:
         raise("Error! abbr_assign_method error.")
     
-    Add_name=opt.Add_name
+    if opt.learn_mode == "SPL":
+        Add_name = opt.spl_mode + "_" + opt.Add_name
+    else:
+        Add_name = opt.Add_name
     model_name=opt.model_name
 
     # FB_detector parameters
