@@ -40,7 +40,7 @@ def object_score_to_HElevel(object_score):
         raise print("object_score error: object_score=", object_score)
 
 num_to_english_c_dic = {3:"three", 5:"five", 7:"seven", 9:"nine", 11:"eleven"}
-iou_threshold = 0.1
+iou_threshold = 0.2
 
 if __name__ == "__main__":
     opt = opts().parse()

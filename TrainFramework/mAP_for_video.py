@@ -67,7 +67,7 @@ if __name__ == "__main__":
     
     label_path = opt.data_root_path + "labels/val/" #.xlm label file path
 
-    video_path = opt.data_root_path + "video/val/"
+    video_path = opt.data_root_path + "videos/val/"
     video_name = opt.video_name
 
     continus_num = input_img_num

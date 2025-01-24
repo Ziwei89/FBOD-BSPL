@@ -69,25 +69,32 @@ def min_max_ref_point_index(bbox, output_feature, model_input_size):
 
     return (min_wight_index, min_height_index, max_wight_index, max_height_index)
 
-def getSPL_SampleWeight_hard(sample_score, threshold_lamda):
-    if sample_score >= threshold_lamda:
-        return 1
-    else:
-        return 0
+# def getSPL_SampleWeight_hard(sample_score, threshold_lamda):
+#     if sample_score >= threshold_lamda:
+#         return 1
+#     else:
+#         return 0
 
-def getSPL_SampleWeight_soft(sample_score, m_root, threshold_lamda):
-    if sample_score >= threshold_lamda:
-        return sample_score ** (1/m_root)
+# def getSPL_SampleWeight_soft(sample_score, m_root, threshold_lamda):
+#     if sample_score >= threshold_lamda:
+#         return sample_score ** (1/m_root)
+#     else:
+#         return 0
+
+### The above function getSPL_SampleWeight_soft is a special case when 0<m<1.
+def getSPL_SampleWeight(sample_score, spl_threshold, m):
+    if sample_score >= spl_threshold:
+        return sample_score**m
     else:
         return 0
 
 class getTargets(nn.Module):
-    def __init__(self, model_input_size, num_classes=2, scale=80., m_root=3, stride=2, cuda=True):
+    def __init__(self, model_input_size, num_classes=2, scale=80., m=3, stride=2, cuda=True):
         super(getTargets, self).__init__()
         self.model_input_size = model_input_size#(672,384)#img_w,img_h
         self.num_classes = num_classes
         self.scale = scale
-        self.m_root = m_root
+        self.m = m
         self.out_feature_size = [self.model_input_size[0]/stride, self.model_input_size[1]/stride] ## feature_w,feature_h
         self.size_per_ref_point = self.model_input_size[0]/self.out_feature_size[0]
 
@@ -229,8 +236,7 @@ class getTargets(nn.Module):
                 else:
                     sample_weight = 0
             elif difficult_mode == 2: # spl-bc mode
-                sample_weight = getSPL_SampleWeight_soft(bbox[5], self.m_root, spl_threshold)
-                # sample_weight = getSPL_SampleWeight_hard(bbox[5], spl_threshold)
+                sample_weight = getSPL_SampleWeight(sample_score=bbox[5],spl_threshold=spl_threshold, m=self.m)
             elif difficult_mode == 3: # spl/hem mode
                 sample_weight = bbox[5]
             else:

@@ -24,23 +24,35 @@ import copy
 import shutil
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-def adjust_spl_threshold(step_proportion=0.01):
+# def adjust_spl_threshold(step_proportion=0.01):
+#     """
+#     spl_threshold
+#         |
+#         |_0.8
+#         | :\ 
+#         | :  \
+#         | :    \
+#         | :      \
+#         | :        \
+#         |_:__________\_______ Step_proportion
+#          0.1         0.9
+#     """
+#     if step_proportion <= 0.1:
+#         return 0.8
+#     elif step_proportion <= 0.9:
+#         return 0.9-step_proportion
+#     else:
+#         return 0.
+    
+### The above function adjust_spl_threshold is a special case when the argument constant=0.8, e1=0.1, e2=0.9 and r=1.
+def adjust_spl_threshold(step_proportion=0.01, e1=0.1, e2=0.9, constant=0.8, r=1):
     """
-    spl_threshold
-        |
-        |_0.8
-        | :\ 
-        | :  \
-        | :    \
-        | :      \
-        | :        \
-        |_:__________\_______ Step_proportion
-         0.1         0.9
+    spl_threshold, spl based on confidence
     """
-    if step_proportion <= 0.1:
-        return 0.8
-    elif step_proportion <= 0.9:
-        return 0.9-step_proportion
+    if step_proportion <= e1:
+        return constant
+    elif step_proportion <= e2:
+        return constant*((0.9-step_proportion)/(e2-e1))**r
     else:
         return 0.
 #---------------------------------------------------#
@@ -254,6 +266,9 @@ if __name__ == "__main__":
         config_txt_file.write("Data augmentation: " + str(opt.data_augmentation) + "\n")
         config_txt_file.write("Learn rate: " + str(opt.lr) + "\n")
         config_txt_file.write("Learn mode: " + opt.learn_mode + "\n")
+        if opt.learn_mode == "SPLBC":
+            config_txt_file.write("The parameter of the Minimize Function: " + str(opt.m) + "\n")
+            config_txt_file.write("The parameter of the Training Scheduling: " + str(opt.r) + "\n")
         config_txt_file.close()
 
     #-------------------------------#
@@ -317,7 +332,7 @@ if __name__ == "__main__":
     # 建立loss函数
     # dynamic label assign, so the gettargets is ture.
     loss_func_train = LossFunc(num_classes=num_classes, model_input_size=(model_input_size[1], model_input_size[0]), \
-                         learn_mode=opt.learn_mode, cuda=Cuda, gettargets=True)
+                         learn_mode=opt.learn_mode, m=opt.m, cuda=Cuda, gettargets=True)
     
     loss_func_val = LossFunc(num_classes=num_classes, model_input_size=(model_input_size[1], model_input_size[0]), \
                          learn_mode="All_Sample", cuda=Cuda, gettargets=True)
@@ -365,7 +380,7 @@ if __name__ == "__main__":
     largest_AP_50=0
     for epoch in range(start_Epoch,end_Epoch):
         if opt.learn_mode == "SPLBC":
-            spl_threshold = adjust_spl_threshold((epoch*1.)/end_Epoch)
+            spl_threshold = adjust_spl_threshold(step_proportion=(epoch*1.)/end_Epoch, r=opt.r)
             net = net.eval()
             print("Update Object Score")
             image_info_list = []

@@ -60,14 +60,14 @@ def box_ciou(b1, b2):
     return ciou
 
 class LossFunc(nn.Module): #
-    def __init__(self,num_classes, model_input_size=(672,384), scale=80., stride=2, learn_mode="SPL", cuda=True, gettargets=False):
+    def __init__(self,num_classes, model_input_size=(672,384), scale=80., m=1/3, stride=2, learn_mode="SPL", cuda=True, gettargets=False):
         super(LossFunc, self).__init__()
         self.num_classes = num_classes
         self.model_input_size = model_input_size
         self.scale = scale
         self.learn_mode = learn_mode
         #(model_input_size, num_classes=2, stride=2)
-        self.get_targets = getTargets(model_input_size, num_classes, scale=scale, stride=stride, cuda=True)
+        self.get_targets = getTargets(model_input_size, num_classes, scale=scale, m=m, stride=stride, cuda=True)
         self.cuda = cuda
         self.gettargets = gettargets
     
@@ -78,7 +78,7 @@ class LossFunc(nn.Module): #
         if self.gettargets:
             if self.learn_mode == "All_Sample":
                 targets = self.get_targets(input, targets, difficult_mode=0) ### targets is a list wiht 2 members, each is a 'bs,in_h,in_w,c' format tensor(cls and bbox).
-            elif self.learn_mode == "Easy_sample":
+            elif self.learn_mode == "Easy_Sample":
                 targets = self.get_targets(input, targets, difficult_mode=1) ### targets is a list wiht 2 members, each is a 'bs,in_h,in_w,c' format tensor(cls and bbox).
             elif self.learn_mode == "SPLBC":
                 targets = self.get_targets(input, targets, difficult_mode=2, spl_threshold=spl_threshold)

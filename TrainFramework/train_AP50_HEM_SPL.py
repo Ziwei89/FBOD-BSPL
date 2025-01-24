@@ -25,23 +25,40 @@ import math
 import shutil
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-def adjust_spl_threshold(step_proportion=0.01):
+# def adjust_spl_threshold(step_proportion=0.01):
+#     """
+#     spl_threshold
+#         |_____________1
+#         |           /:
+#         |         /  :
+#         |       /    :
+#         |     /      :
+#         |   /        :
+#     0.2 |_/          :
+#         |_:__________:______ Step_proportion
+#          0.1         0.9
+#     """
+#     if step_proportion <= 0.1:
+#         return 0.2
+#     elif step_proportion <= 0.9:
+#         return step_proportion + 0.1
+#     else:
+#         return 1.
+
+### The above function adjust_spl_threshold is a special case when the argument lambda0=0.2, e1=0.1, e2=0.9 and r=1.
+def adjust_spl_threshold(lambda0=0.2, e1=0.1, e2=0.9, step_proportion=0.01, r=1):
     """
-    spl_threshold
-        |_____________1
-        |           /:
-        |         /  :
-        |       /    :
-        |     /      :
-        |   /        :
-    0.2 |_/          :
-        |_:__________:______ Step_proportion
-         0.1         0.9
+    spl_threshold, spl based on loss
+
     """
-    if step_proportion <= 0.1:
-        return 0.2
-    elif step_proportion <= 0.9:
-        return step_proportion + 0.1
+    if e1 < 0:
+        raise("Error! e1 must be larger than or equal to 0!")
+    if e2 <= e1:
+        raise("Error! e2 must be large e1!")
+    if step_proportion <= e1:
+        return lambda0
+    elif step_proportion <= e2:
+        return (1-(1-lambda0)*((e2-step_proportion)/(e2-e1))**r)
     else:
         return 1.
 
@@ -62,6 +79,15 @@ def spl_sampleWeight_Logarithmic(sample_loss, spl_threshold):
     if sample_loss < spl_threshold:
         parameter2 = 1- spl_threshold
         weight = (math.log(sample_loss + parameter2)/math.log(parameter2+0.01))
+        return weight
+    else:
+        return 0
+
+def spl_sampleWeight_Polynomial(sample_loss, spl_threshold, t_parameter=3):
+    if t_parameter<=1:
+        raise("t_parameter must lager than 1!")
+    if sample_loss < spl_threshold:
+        weight = (1-sample_loss/spl_threshold)**(1/(t_parameter-1))
         return weight
     else:
         return 0
@@ -280,9 +306,10 @@ if __name__ == "__main__":
         config_txt_file.write("Batch size: " + str(opt.Batch_size) + "\n")
         config_txt_file.write("Data augmentation: " + str(opt.data_augmentation) + "\n")
         config_txt_file.write("Learn rate: " + str(opt.lr) + "\n")
-        config_txt_file.write("Learn mode: " + opt.learn_mode + "\n")
+        config_txt_file.write("Learn mode: " + opt.learn_mode + "\n")  
         if opt.learn_mode == "SPL":
             config_txt_file.write("SPL mode: " + opt.spl_mode + "\n")
+            config_txt_file.write("The parameter of the Training Scheduling: " + str(opt.r) + "\n")
         config_txt_file.close()
 
     #-------------------------------#
@@ -300,7 +327,7 @@ if __name__ == "__main__":
     else:
         annotation_root_path = "./dataloader/"
 
-    train_annotation_path = annotation_root_path + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_train.txt"
+    train_annotation_path = annotation_root_path + "img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_" + Add_name + "_train.txt"
     if not os.path.exists(train_annotation_path):
         shutil.copy("./dataloader/img_label_" + num_to_english_c_dic[opt.input_img_num] + "_continuous_difficulty_train.txt", train_annotation_path)
 
@@ -425,7 +452,7 @@ if __name__ == "__main__":
             ### Update the object weight by rewriting all the information.
             annotation_file = open(train_annotation_path,'w')
             if opt.learn_mode == "SPL":
-                spl_threshold = adjust_spl_threshold((epoch*1.)/end_Epoch)
+                spl_threshold = adjust_spl_threshold(step_proportion=(epoch*1.)/end_Epoch, r=opt.r)
                 for image_info_instance in image_info_list:
                     annotation_file.write(image_info_instance.iname)
                     if len(image_info_instance.box_info_list) == 0:
@@ -438,6 +465,8 @@ if __name__ == "__main__":
                                 sample_weight = spl_sampleWeight_Linear(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
                             elif opt.spl_mode == "logarithmic":
                                 sample_weight = spl_sampleWeight_Logarithmic(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
+                            elif opt.spl_mode == "Polynomial":
+                                sample_weight = spl_sampleWeight_Polynomial(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
                             else:
                                 raise("Error, no such spl mode.")
                             string_label = " " + ",".join(str(int(a)) for a in box_info_instance.bbox) + "," + str(int(box_info_instance.class_id)) + "," + str(sample_weight)

@@ -132,9 +132,9 @@ if __name__ == "__main__":
                               learn_mode=learn_mode, abbr_assign_method=abbr_assign_method, Add_name=Add_name, model_name=model_name, scale=opt.scale_factor)
 
 
-    label_path = opt.data_root_path + "val/labels/" #.xlm label file path
+    label_path = opt.data_root_path + "labels/val/" #.xlm label file path
 
-    video_path = opt.data_root_path + "val/video/"
+    video_path = opt.data_root_path + "videos/val/"
 
     continus_num = input_img_num
     
