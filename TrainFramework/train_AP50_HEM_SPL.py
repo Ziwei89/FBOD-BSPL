@@ -75,6 +75,16 @@ def spl_sampleWeight_Linear(sample_loss, spl_threshold):
     else:
         return 0
 
+def spl_sampleWeight_Continuous(sample_loss, spl_threshold, b_parameter=0.5):
+    if b_parameter>=1 or b_parameter<=0:
+        raise("b_parameter must be in range (0, 1)!")
+    if sample_loss < spl_threshold*(1-b_parameter):
+        return 1
+    elif sample_loss >= spl_threshold*(1-b_parameter) and sample_loss <= spl_threshold:
+        return (1/b_parameter)*(1 - sample_loss/spl_threshold)
+    else:
+        return 0
+
 def spl_sampleWeight_Logarithmic(sample_loss, spl_threshold):
     if sample_loss < spl_threshold:
         parameter2 = 1- spl_threshold
@@ -85,7 +95,7 @@ def spl_sampleWeight_Logarithmic(sample_loss, spl_threshold):
 
 def spl_sampleWeight_Polynomial(sample_loss, spl_threshold, t_parameter=3):
     if t_parameter<=1:
-        raise("t_parameter must lager than 1!")
+        raise("t_parameter must be larger than 1!")
     if sample_loss < spl_threshold:
         weight = (1-sample_loss/spl_threshold)**(1/(t_parameter-1))
         return weight
@@ -467,6 +477,8 @@ if __name__ == "__main__":
                                 sample_weight = spl_sampleWeight_Logarithmic(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
                             elif opt.spl_mode == "Polynomial":
                                 sample_weight = spl_sampleWeight_Polynomial(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
+                            elif opt.spl_mode == "Continuous":
+                                sample_weight = spl_sampleWeight_Continuous(sample_loss=box_info_instance.sample_loss, spl_threshold=spl_threshold)
                             else:
                                 raise("Error, no such spl mode.")
                             string_label = " " + ",".join(str(int(a)) for a in box_info_instance.bbox) + "," + str(int(box_info_instance.class_id)) + "," + str(sample_weight)

@@ -76,7 +76,9 @@ class opts(object):
                                  "hard": hard regularizer, \
                                  "linear": soft regularizer with linear, \
                                  "logarithmic": soft regularizer with logarithmic, \
-                                 "Polynomial": soft regularizer with Polynomial.')
+                                 "Polynomial": soft regularizer with Polynomial, \
+                                 "Continuous": soft regularizer with Continuous.' \
+                                 )
         
         self.parser.add_argument('--m', default=1.0/3, type=float,
                             help='m: The parameter of the Minimize Function.')
